@@ -5,34 +5,34 @@ algorithms written in Python with zero additional code.
 
 It ships with two commands: 
 	
-	```bash
-	$ clum my_script.py --target=my_func --args=my_args
-	``` 
-	runs a target function found from my_script.py using every set of arguments
-	in the iterable my_args, using as many processes as there are cpu cores 
-	available.  The `args` iterator should group arguments for a single 
-	invocation in a tuple.  Single-argument invocations need not be within a 
-	tuple if the argument is not itself a tuple.  Specify the number of 
-	processors using `--processes`.  If the target function and arguments 
-	iterable are called `target` and `args`, omit those options.  Environment 
-	variabes are inherited.  Pass through command line arguments to my_script.py 
-	by placing them after a '--'.
+```bash
+$ clum my_script.py --target=my_func --args=my_args
+``` 
+runs a target function found from my_script.py using every set of arguments
+in the iterable my_args, using as many processes as there are cpu cores 
+available.  The `args` iterator should group arguments for a single 
+invocation in a tuple.  Single-argument invocations need not be within a 
+tuple if the argument is not itself a tuple.  Specify the number of 
+processors using `--processes`.  If the target function and arguments 
+iterable are called `target` and `args`, omit those options.  Environment 
+variabes are inherited.  Pass through command line arguments to my_script.py 
+by placing them after a '--'.
 
-	```bash
-	$ cluf myscript.py --target=my_func --args=my_args --nodes=12
-	```
-	runs a target function on the indicated number of machines (here 12), 
-	using as many processors as are available, by splitting up the work
-	into sub-jobs and submitting the sub-jobs via qsub.  Environment 
-	variables are *not* inherited, but can be specified using options (see 
-	"`cluf` options").  Pass through command line arguments as with `clum`.  
-	Optionally ommit the  `--target` and `--args` options as with `clum`.  
-	Specify resource requirements via PBS options (see "`cluf` options").
+```bash
+$ cluf myscript.py --target=my_func --args=my_args --nodes=12
+```
+runs a target function on the indicated number of machines (here 12), 
+using as many processors as are available, by splitting up the work
+into sub-jobs and submitting the sub-jobs via qsub.  Environment 
+variables are *not* inherited, but can be specified using options (see 
+"`cluf` options").  Pass through command line arguments as with `clum`.  
+Optionally ommit the  `--target` and `--args` options as with `clum`.  
+Specify resource requirements via PBS options (see "`cluf` options").
 
-	Note, properly dividing
-	the work into sub-jobs assumes that your iterator is stable (that it 
-	yields the same element in the same order during execution of each sub-job.
-	if that is not the case, see "How binning works" below). 
+Note, properly dividing
+the work into sub-jobs assumes that your iterator is stable (that it 
+yields the same element in the same order during execution of each sub-job.
+if that is not the case, see "How binning works" below). 
 
 ## Why?
 
