@@ -98,13 +98,6 @@ To divide the work properly, it's important that your argument iterable yields
 the same arguments in the same order on each machine.  If you can't or don't
 want write your iterable that way, see **How work is divided** for other options.
 
-
-By default subjob scripts are written to the current working directory.  When
-the job runs, the stdout and stderr will be written to that directory, in files
-with the same name as sub-job's script, but with .stdout and .stderr
-extentions.  An option exists to place these elsewhere, see "Reference" below
-for all options.
-
 ## How work is divided 
 Work is divided by assuming that the arguments iterator will yield the same
 arguments in the same order during each subjob.  Each subjob can then execute
