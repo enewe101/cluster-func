@@ -87,7 +87,7 @@ stdout and stdin to be captured into files by the same name (but with
 extentions .stdout and .stdin) in the current working directory.  PBS
 directives appear as comments, so the scripts are perfectly valid shell scripts
 that can be executed normally.  You can set any PBS directives you want, see
-"Cluf options", and "Reference" for details.)
+**Cluf options**, and **Reference** for details.)
 
 To divide the work properly, it's important that your argument iterable yields
 the same arguments in the same order on each machine.  If you can't or don't
