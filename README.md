@@ -1,6 +1,6 @@
-# `cluster-func`
+# Cluster-func
 
-`cluster-func` is a command line tool that lets you scale embarassingly parallel 
+Cluster-func is a command line tool that lets you scale embarassingly parallel 
 solution written in Python with zero additional code.
 
 ## Install
@@ -24,7 +24,7 @@ boilerplate code, which, despite being conceptually straightforward, is tedious
 and error-prone.  Let's never do it again.
 
 ## Basic usage
-`cluster-func` is designed for situations where you need to run a single function
+Cluster-func is designed for situations where you need to run a single function
 on many different arguments.  This kind embarassingly parallelizable problem
 comes up pretty often.  At it's minimum, a solution involves defining
 A) the function to be repeatedly called, and B) all of the different arguments
