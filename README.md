@@ -47,7 +47,7 @@ will look in my_script.py for a function called `target` and an iterable called
 spawning as many workers as there are cpu cores available to your user on the
 machine.  
 
-If `args` yields a tuple, its contents will be unpacked and used positional
+If `args` yields a tuple, its contents will be unpacked and used as positional
 arguments.  Single-argument invocations need not be packed into a 1-tuple 
 (unless that argument is itself a tuple).  Separate invocations can use different
 numbers of arguments.
@@ -76,7 +76,7 @@ use.  This command:
 ```bash
 $ cluf my_script.py --nodes=10 --queue	# short options -n, -q
 ```
-will, break the work into 10 subjobs, and submit them using qsub.  It does
+will break the work into 10 subjobs, and submit them using qsub.  It does
 this by writing small bash scripts that each call the target function on a
 subset of the arguments yielded by the iterable.
 
@@ -85,8 +85,6 @@ directives.  Because these directives appear as comments, the scripts can
 be run normally.  You can use options or configurations to control what PBS
 directives appear.  By default, the subjobs have directives that cause the
 stdout and stderr to be captured into files in the current working directory
-
-~~~
 
 To divide the work properly, it's important that your argument iterable yields
 the same arguments in the same order on each machine.  If you can't or don't
