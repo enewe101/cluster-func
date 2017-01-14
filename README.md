@@ -79,14 +79,15 @@ use.  This command:
 $ cluf my_script.py --nodes=10 --queue	# short options -n, -q
 ```
 will break the work into 10 subjobs, and submit them using qsub.  It does
-this by writing small bash scripts that each call the target function on a
+this by writing small shell scripts that each call the target function on a
 subset of the arguments yielded by the iterable.
 
-Each subjob script is shell script with Portable Batch System 
-directives.  Because these directives appear as comments, the scripts can
-be run normally.  You can use options or configurations to control what PBS
-directives appear.  By default, the subjobs have directives that cause the
-stdout and stderr to be captured into files in the current working directory
+(Each shell script has Portable Batch System (PBS) directives that cause the
+stdout and stdin to be captured into files by the same name (but with
+extentions .stdout and .stdin) in the current working directory.  PBS
+directives appear as comments, so the scripts are perfectly valid shell scripts
+that can be executed normally.  You can set any PBS directives you want, see
+"Cluf options", and "Reference" for details.)
 
 To divide the work properly, it's important that your argument iterable yields
 the same arguments in the same order on each machine.  If you can't or don't
