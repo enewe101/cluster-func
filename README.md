@@ -91,7 +91,7 @@ that can be executed normally.  You can set any PBS directives you want, see
 Because each subjob script is a valid shell script, you can manually run them
 on separate machines in case they aren't part of a cluster that uses `qsub`.
 Just leave off the `--queue` option, and the scripts will be created but not
-enqueued using `qsub`.  This is also a good way to test run one of the subjobs
+enqueued.  This is also a good way to test run one of the subjobs
 before submitting it.
 
 To divide the work properly, it's important that your argument iterable yields
@@ -110,7 +110,7 @@ If you open the subjob scripts in an editor, you'll find that they actually
 call `cluf` itself in *direct mode*.  In other words, when you run
 `cluf` in dispatch mode, it creates scripts that call `cluf` in direct mode.
 
-These direct-mode invocations of `cluf` use the `--bin` option, which
+These direct-mode invocations use the `--bin` option, which
 is what instructs `cluf` to only run arguments that fall into that subjob's 
 bin.  For example, this command:
 ```bash
