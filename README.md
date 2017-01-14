@@ -99,9 +99,9 @@ the same arguments in the same order on each machine.  If you can't or don't
 want write your iterable that way, see **How work is divided** for other options.
 
 ## How work is divided 
-Work is divided by assuming that the arguments iterator will yield the same
-arguments in the same order during each subjob.  Each subjob can then execute
-the target function only on those arguments assigned to it.  
+By default, work is divided by assuming that the arguments iterator will yield
+the same arguments in the same order during each subjob.  Each subjob can then
+execute the target function only on those arguments assigned to it.  
 
 For example, if there were 10 subjobs, subjob 7 would run arguments 7, 17, 27,
 ... etc.  For ease of explanation, we'll call that subset "bin 7".
@@ -110,7 +110,7 @@ If you open the subjob scripts in an editor, you'll find that they actually
 call `cluf` itself in *direct mode*.  In other words, when you run
 `cluf` in dispatch mode, it creates scripts that call `cluf` in direct mode.
 
-However, these direct-mode invocations of `cluf` use the `--bin` option, which
+These direct-mode invocations of `cluf` use the `--bin` option, which
 is what instructs `cluf` to only run arguments that fall into that subjob's 
 bin.  For example, this command:
 ```bash
@@ -119,12 +119,8 @@ $ cluf my_script --bin=0/3		# short option: -b
 Would run `cluf` in direct mode, but only execute iterations falling into bin 0 
 out of 3, i.e., iterations 0, 3, 6, 9, etc.  (Bins are zero-indexed.)
 
-This means that if you're machines aren't part of a cluster that uses qsub, 
-you can use the `--bin` option to spread work over multiple machines
-by logging into each machine and running `cluf` in direct mode using different
-bins.  
-
-If you like, you can assign multiple bins to one subjob, For example, the option
+You can use this to start subjobs on machines manually if you like.
+You can assign multiple bins to one subjob, For example, the option
 `--bins=0-2,5/10` will assign bins 0, 1, 2, and 5 (out of a total of 10 bins).
 
 ### If your iterable is not stable
@@ -133,7 +129,7 @@ yield the same arguments in the same order during execution of each subjob.
 If you can't ensure that, then binning can be based on the arguments themselves,
 instead of their order.
 
-There are two alernative ways to hadle bnning: using *argument hashing* and
+There are two alernative ways to handle binning: using *argument hashing* and
 *direct assignment*.
 
 ### Argument hashing
@@ -145,9 +141,9 @@ For example, doing
 ```bash
 $ cluf example --nodes=12 --hash=0		# or use -n and -x
 ```
-will instruct `cluf` to hash the first argument before calling the target 
-function to decide which bin the iteration belongs to.  Before hashing,
-`cluf` calls `str` on the argument (so for this purpose, lists are hashable).
+will instruct `cluf` to hash the first argument of each iteration to decide
+which bin the iteration belongs to.  Before hashing, `cluf` calls `str` on the
+argument (so for this purpose, lists are hashable).
 
 To use this approach, it's important that the argument selected for hashing
 has a stable string representation that reflects its value, so passing
