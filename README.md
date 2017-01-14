@@ -112,7 +112,7 @@ If you open the subjob scripts in an editor, you'll find that they actually
 call `cluf` itself in *direct mode*.  In other words, when you run
 `cluf` in dispatch mode, it creates scripts that call `cluf` in direct mode.
 
-However, these direct-mode invocations `cluf` use the `--bin` option, which
+However, these direct-mode invocations of `cluf` use the `--bin` option, which
 is what instructs `cluf` to only run arguments that fall into that subjob's 
 bin.  For example, this command:
 ```bash
