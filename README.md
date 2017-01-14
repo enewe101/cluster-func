@@ -69,9 +69,8 @@ want to use the dispatch mode.
 
 ### Dispatch mode
 The main use of dispatch mode is to spread the work in a cluster that
-uses the `qsub` command for job submission.  (You can still use `cluf` to spread
-work between machines don't use `qsub`, or that can't communicate; see 
-"How work is divided".)
+uses the `qsub` command for job submission.  But you can still use `cluf` to 
+spread work between machines don't use `qsub`.
 
 Batch mode is implicitly invoked when you specify a number of compute nodes to 
 use.  This command:
@@ -89,9 +88,12 @@ directives appear as comments, so the scripts are perfectly valid shell scripts
 that can be executed normally.  You can set any PBS directives you want, see
 **Cluf options**, and **Reference** for details.)
 
+Because each subjob script is a valid shell script, you can manually run them
+on separate machines in case they aren't part of a cluster that uses `qsub`.
+
 To divide the work properly, it's important that your argument iterable yields
 the same arguments in the same order on each machine.  If you can't or don't
-want write your iterator that way, see "How work is divided" for other options.
+want write your iterator that way, see **How work is divided** for other options.
 
 If you want to test-run one of the subjobs before submitting them, just
 just leave off the `--queue` option, and the scripts will be created but not
