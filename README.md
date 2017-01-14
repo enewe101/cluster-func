@@ -90,14 +90,14 @@ that can be executed normally.  You can set any PBS directives you want, see
 
 Because each subjob script is a valid shell script, you can manually run them
 on separate machines in case they aren't part of a cluster that uses `qsub`.
+Just leave off the `--queue` option, and the scripts will be created but not
+enqueued using `qsub`.  This is also a good way to test run one of the subjobs
+before submitting it.
 
 To divide the work properly, it's important that your argument iterable yields
 the same arguments in the same order on each machine.  If you can't or don't
-want write your iterator that way, see **How work is divided** for other options.
+want write your iterable that way, see **How work is divided** for other options.
 
-If you want to test-run one of the subjobs before submitting them, just
-just leave off the `--queue` option, and the scripts will be created but not
-enqueued.
 
 By default subjob scripts are written to the current working directory.  When
 the job runs, the stdout and stderr will be written to that directory, in files
