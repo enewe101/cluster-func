@@ -1,44 +1,7 @@
 # `cluster-func`
 
 `cluster-func` is a command line tool that lets you scale embarassingly parallel 
-algorithms written in Python with zero additional code.
-
-It ships with two commands: 
-	
-```bash
-$ clum my_script.py --target=my_func --args=my_args
-``` 
-runs a target function found from my_script.py using every set of arguments
-in the iterable my_args, using as many processes as there are cpu cores 
-available.  The `args` iterator should group arguments for a single 
-invocation in a tuple.  Single-argument invocations need not be within a 
-tuple if the argument is not itself a tuple.  Specify the number of 
-processors using `--processes`.  If the target function and arguments 
-iterable are called `target` and `args`, omit those options.  Environment 
-variabes are inherited.  Pass through command line arguments to my_script.py 
-by placing them after a '--'.
-
-```bash
-$ cluf myscript.py --target=my_func --args=my_args --nodes=12
-```
-runs a target function on the indicated number of machines (here 12), 
-using as many processors as are available, by splitting up the work
-into sub-jobs and submitting the sub-jobs via qsub.  Environment 
-variables are *not* inherited, but can be specified using options (see 
-"`cluf` options").  Pass through command line arguments as with `clum`.  
-Optionally ommit the  `--target` and `--args` options as with `clum`.  
-Specify resource requirements via PBS options (see "`cluf` options").
-
-Note, properly dividing
-the work into sub-jobs assumes that your iterator is stable (that it 
-yields the same element in the same order during execution of each sub-job.
-if that is not the case, see "How binning works" below). 
-
-## Why?
-
-Too often I find myself writing multiprocessing and job-division / scheduling
-boilerplate code, which, despite being conceptually straightforward, is tedious
-and error-prone.  Let's never do it again.
+solution written in Python with zero additional code.
 
 ## Install
 
@@ -54,129 +17,179 @@ cd cluster-func
 python setup.py develop
 ```
 
-## Example
+## Why?
 
-Suppose we want to process a million files, writing the output to disk.
-(Sorry, for simplicity, I'm forgoing context managers to open files D: )
+Too often I find myself writing multiprocessing and job-division / scheduling
+boilerplate code, which, despite being conceptually straightforward, is tedious
+and error-prone.  Let's never do it again.
 
-(process_files.py)
-```python
-def target(in_path, out_path):
-	processed = do_stuff_with(in_path)
-	open(out_path, 'w').write(processed)
+## Basic usage
+`cluster-func` is designed for situations where you need to run a single function
+on many different arguments.  This kind embarassingly parallelizable problem
+comes up pretty often.  At it's minimum, a solution involves defining
+A) the function to be repeatedly called, and B) all of the different arguments
+on which it should be called.  Cluster-func assumes that you have defined
+these in the form of a callable and an iterable within a python script, and
+then it handles the business of spreading the work across cores and machines.
 
-args = [ 
-	('input/dir/' + fname, 'output/dir/' + fname)
-	for fname in os.listdir('input/dir')
-]
-```
+The tool has two modes.  In "direct mode", it runs your function on the cpus of
+a single machine.  In "dispatch mode", it breaks the work into subjobs that can
+be run on separate machines, and optionally submits them to a job scheduler
+using `qsub`.
 
-To do all the work on one machine, using all available processes:
+### Direct mode
+This command:
 ```bash
-$ clum process_files.py
-```
+$ cluf my_script.py 
+``` 
+will look in my_script.py for a function called `target` and an iterable called
+`args`, and it will run `target` on every single value yielded from `args`,
+spawning as many workers as there are cpu cores available to your user on the
+machine.  
 
-To do all the work on 12 machines on a cluster that uses qsub for job 
-submission:
+If `args` yields a tuple, its contents will be unpacked and used positional
+arguments.  Single-argument invocations need not be packed into a 1-tuple 
+(unless that argument is itself a tuple).  Separate invocations can use different
+numbers of arguments.
+
+`args` can also be a callable that *returns* an iterable (including a generator),
+which is often more convenient.
+
+To use other names for you target function or arguments iterable,
+or to use a different number of worker processes, do this:
 ```bash
-$ cluf process_files.py --nodes=12
+$ cluf my_script.py --target=my_func --args=my_iterable --processes=12	# short options -t, -a, -p
 ```
 
-## Let `cluf` decide how many nodes to use
+This means you can multiprocess any script without pools or queues or even
+importing multiprocessing.  But, if you really need to scale up, then you'll
+want to use the dispatch mode.
 
-Rather than specifying the number of nodes (sub-jobs) directly, you can specify 
-the number of iterations to be executed on each node.  `cluf` will count the
-total number of iterations, and figure out how many sub-jobs to make:
+### Dispatch mode
+The main use of dispatch mode is to spread the work in a cluster that
+uses the `qsub` command for job submission.  (You can still use `cluf` to spread
+work between machines don't use `qsub`, or that can't communicate; see 
+"How work is divided".)
+
+Batch mode is implicitly invoked when you specify a number of compute nodes to 
+use.  This command:
+```bash
+$ cluf my_script.py --nodes=10 --queue	# short options -n, -q
+```
+will, break the work into 10 subjobs, and submit them using qsub.  It does
+this by writing small bash scripts that each call the target function on a
+subset of the arguments yielded by the iterable.
+
+Each subjob script is shell script with Portable Batch System 
+directives.  Because these directives appear as comments, the scripts can
+be run normally.  You can use options or configurations to control what PBS
+directives appear.  By default, the subjobs have directives that cause the
+stdout and stderr to be captured into files in the current working directory
+
+~~~
+
+To divide the work properly, it's important that your argument iterable yields
+the same arguments in the same order on each machine.  If you can't or don't
+want write your iterator that way, see "How work is divided" for other options.
+
+If you want to test-run one of the subjobs before submitting them, just
+just leave off the `--queue` option, and the scripts will be created but not
+enqueued.
+
+By default subjob scripts are written to the current working directory.  When
+the job runs, the stdout and stderr will be written to that directory, in files
+with the same name as sub-job's script, but with .stdout and .stderr
+extentions.  An option exists to place these elsewhere, see "Reference" below
+for all options.
+
+## How work is divided 
+Work is divided by assuming that the arguments iterator will yield the same
+arguments in the same order during each subjob.  Each subjob can then execute
+the target function only on those arguments assigned to it.  
+
+For example, if there were 10 subjobs, subjob 7 would run arguments 7, 17, 27,
+... etc.  For ease of explanation, we'll call that subset "bin 7".
+
+If you open the subjob scripts in an editor, you'll find that they actually
+call `cluf` itself in *direct mode*.  In other words, when you run
+`cluf` in dispatch mode, it creates scripts that call `cluf` in direct mode.
+
+However, these direct-mode invocations `cluf` use the `--bin` option, which
+is what instructs `cluf` to only run arguments that fall into that subjob's 
+bin.  For example, this command:
+```bash
+$ cluf my_script --bin=0/3		# short option: -b
+```
+Would run `cluf` in direct mode, but only execute iterations falling into bin 0 
+out of 3, i.e., iterations 0, 3, 6, 9, etc.  (Bins are zero-indexed.)
+
+This means you can use the `--bin` option to spread work over multiple machines
+by logging into each machine and running `cluf` in direct mode using different
+bins.  You can also do multiple bins in one subjob, For example,
+`--bins=0-2,5/10` will assign bins 0, 1, 2, and 5 (out of a total of 10 bins).
+
+### If your iterable is not stable
+The default approach to binning assumes that the arguments iterable will 
+yield the same arguments in the same order during execution of each subjob.
+If you can't ensure that, then binning can be based on the arguments themselves,
+instead of their order.
+
+There are two alernative ways to hadle bnning: using *argument hashing* and
+*direct assignment*.
+
+### Argument hashing
+By specifying the `--hash` option, you can instruct `cluf` to hash one of the
+arguments to determine its bin.
+
+For example, doing
 
 ```bash
-$ cluf example --iterations=200	# or use -i
+$ cluf example --nodes=12 --hash=0		# or use -n and -x
 ```
+will instruct `cluf` to hash the first argument before calling the target 
+function to decide which bin the iteration belongs to.  Before hashing,
+`cluf` calls `str` on the argument (so for this purpose, lists are hashable).
 
-(Performance note -- `cluf` will iterate through your iterator once completely
-to figure out how many nodes are needed, which may cause some delay).
+To use this approach, it's important that the argument selected for hashing
+has a stable string representation that reflects its value, so passing
+objects that don't implement `__str__` won't work, both because their string
+representation doesn't reflect their value, and because their memory address
+appears within it, which will be different in each subjob.
 
-## Split work accross nodes without using `qsub`
-If you have access to machines that aren't under a scheduler that uses qsub,
-you can still manually dispatch sub jobs to each machine.  In this case,
-you'll log into each machine, and use `clum` to run each sub-job.  `clum`
-accepts a `--bin` argument, which instructs it to execute the target function
-over a specific subset (or bin) of arguments yielded from the iterable:
-
+Ideally the argument selected for hashing should be unique throughout iteration,
+since repeated values will be assigned to the same subjob.  You can also specify
+combinations of arguments to be hashed, which are more likely to be unique.
+For example, this:
 ```bash
-$ clum example --bin=0/3		# or use -b
+$ cluf example --nodes=12 --hash=0-2,5		# or use -n and -x
 ```
+will hash arguents 0,1,2, and 5.  Because each iteration can use a different
+number of arguments, if one of the hashed arguments is missing, it is considered
+equal to `None`.
 
-In the above example, the bin specification means "bin 0 of 3".  This instructs
-clum to divide the iterations into 3 approximately equal bins, and to execute
-iterations belonging to the zeroth bin.  Bins are zero indexed.  The normal
-usage would be to log into two other machines and run sub-jobs using the bin
-sepcifications `1/3` and `2/3`.  As long as your arguments iterator is stable
-(yielding the same elements in the same order on each machine), the sub-jobs
-are guaranteed to cover all iterations without duplication.  If your iterator
-is not stable, see "How binning works".
-
-If you want to send more work to certain machines, you can achieve that by
-having machines complete more than one bin.  For example, to do two-thirds
-of the work on one machine, use `--bin=0,1/3`, and do one third of the work
-on the other machine using `--bin=2/3`.  You can combine comma separated 
-ranges and integers for specifying the bins to be performed, so 
-`--bin=0-2,7/8` is a valid way to do bins 0,1,2, and 7 (out of a total of 8 
-bins).
-
-If your machines have very different numbers of available cpus, you could, for
-example, have as many bins as you have total cpus, and assign each machine as
-many bins as it has cpus, to divide work evenly over cpus.  You probably
-should'tget too fancy.  If you are getting fancy, cluster-func might not be the
-right tool!
-
-
-## How binning works
-`cluf` and `clum` split up the work into sub-jobs or "bins", by dealing out 
-arguments
-from the arguments iterator like dealing playing cards -- the i-th argument goes
-in bin i % num_bins. For that to work your iterator must be "stable": it should
-yield the same elements in the same order during execution of each sub-job.
-
-If you can't or don't want to write a stable iterator, you have two other
-options.  First, `cluf` can hash one or more of the arguments to determine the 
-bin as follows:
-
-```bash
-$ cluf example --nodes=12 --hash=0-2,7		# or use -n and -x
-```
-
-In the above command, `cluf` will hash the *string representation* of arguments
-0,1,2, and 7 to determine the bin for a given interation.  Any string
-or number that is nearly unique throughout iteration is suitable.
-It's critical that the chosen argument(s) have a stable string representation, 
-so, for example, they shouldn't include objects whose memory address appears
-Uniqueness is a soft requirement -- repeated values will be routed to the same
-bin, which isn't a huge deal if rare, but could cause load imbalance.
-
-Usually it's best just to set up a stable iterator.  The hashing approach
-above is a good alternative.  A final method is to explicitly specify the
-bin for each iteration using one of the arguments:
+### Direct assignment
+A final method is to include an argument that explicitly specifies the
+bin for each iteration.  To activate direct assignment, and to specify which
+argument should be interpreted as the bin, use `--key` option:
 
 ```bash
 $ cluf example --nodes=12 --key=2 		# or use -n and -k
 ```
+In the command above, argument 2 (the third argument) will be interpreted as
+the bin for each iteration.
 
-Bins are zero-indexed, so the key argument must always be an interger from 0 to 
-one less than the number of nodes, inclusive.  This isn't the recommended 
-approach.  It starts to couple your code to `cluf` and commits you to a specific 
-number of bins.  It's up to you to make sure that the key argument is always a 
-valid bin, since if it's not, that iteration would be passed over silently.
-
+You should only use direct assignment if you really have to, because it's more
+error prone, and it makes it more difficult to change the number bins.  It also
+introduces job division logic into your script which `cluf` was designed to
+prevent.
 
 # Reference
 
-## `clum`
-
-The `clum` command has lots of options, most of which can be specified in either
+The `cluf` command has lots of options, most of which can be specified in either
 of two places:
 
-	1. as command line arguments, or
-	2. within your target module, inside a dictionary called clum_options
+ 1. as command line arguments, or
+ 2. within your target module, inside a dictionary called clum_options
 
 When an option is set in both places, the command line option overrides.
 Using clum_options helps to document how your script was run, while using the
@@ -233,168 +246,7 @@ optional arguments:
                         has to be counted before dispatching in order to
                         determine the number of compute nodes needed.
 
-## Binning unstable iterables
 
-The default strategy for binning assigns iterations to bins based on their
-position in the arguments iterable -- like how playing cards are dealt.  This
-only works if, on each machine, the iterable's order and contents are consistent.
-
-There are a variety of reasons why that might not be a convenient set up your
-iterator in a way that guarantees stability, and there are a few other options
-for binning available to you.
-
-### Explicitly set the bin using your iterator
-One option is to have your iterator explicitly provide the bin assignment as
-one of the arguments in each argument set.  Be sure that, if you are running
-with `n` bins, this argument's value is always an integer from 0 to n-1, since
-other values correspond to non-existent bins and would be silently skipped.
-
-This can be accomplished in two ways:
-
-	1. Use the `cluf` argument `--key` or `-k`, and provide the position of the
-		argument to be used as the key:
-
-			```bash
-			$ cluf my_script -key=0
-			```
-
-	2. Include a dicionary called `cluf_options` in your target module, and
-		provide the key within it:
-		
-			(in my_script.py)
-			```python
-			cluf_options = {'key':0}
-			```
-
-### Use a unique argument as the basis for binning Explicitly setting the bin
-gives predictable behaviour, and allows you to control where given iterations
-are executed which can be useful.  However, it forces you to address
-work-splitting concerns in your iterator, which means not writing zero code,
-and which commits you to a specific number of bins.
-
-Usually your iterator yields unique argument sets, and hashing these can be
-used as the basis for binning.  It's necessary that the arguments have a stable
-string representation (so objects that show their memory address won't work).
-Uniqueness is not strictly necessary -- repeated values will be routed to the
-same bin, and if that happens rarely it won't imbalance workloads too much.
-
-To designate certain argument(s) as the basis for binning, do one of the
-following:
-
-	1. Use the `cluf` argument `--hash` or `-h`, and provide the position(s) of 
-		the arguments to be used for binning.  These can be single integers,
-		ranges, and comma-separated combinations:
-
-			```bash
-			$ cluf my_script -hash=0-3,7
-			```
-		
-		This would hash the string representation of use arguments 0,1,2,3 and 7
-		to determine the bin.
-
-	2. Include a dicionary called `cluf_options` in your target module, and
-		provide a list of argument positions within it:
-		
-			(in my_script.py)
-			```python
-			cluf_options = {'key':[0,1,2,3,7]}
-			```
-
-Note that using argument hashes won't distribute work perfectly evenly, but 
-it will still be fairly even, following the `balls in bins` distribution, 
-meaning that, assuming each iteration takes the same amount of time, 
-instead of taking O(n) time for the final iteration to complete, it will take
-order of log n / log log n.  No big deal.  Put in the work to stabalize your
-iterator if it matters to you!
-
-
-
-
-Boom! Don't write multiprocessing / cluster-job-splitting code for embarassingly
-parallel problems ever again!
-
-## A few more details.
-
-Before you flood the cluster with jobs, there's a few more helpful details
-and some handy tricks to know about.
-
-### Do a subset of the work
-
-The `clum` command has a handy and intuitive way of running the target function
-on a subset of the arguments.  This is accomplished using the `--bins` or `-b`
-option, so-named because it separates the work into differnt bins or buckets,
-and performs the specified bin.  It's best illustrated by example:
-
-```bash
-$ clum example --bins=0/2	
-```
-
-The bins argument takes two integers, separated by a slash.  The first number
-indicates which bin should be done, and the second argument indicates the
-total number of bins.  In the above example, the command will execute bin 0
-of 2, or in other words, it will do approximately half ot the work.  The other
-half of the work would be done by specifying `--bins=1/2`.  Note that bins
-are zero-indexed.
-
-This gives you a handy way to distrubte your work across a few machines even
-if they aren't linked together and managed by a job scheduler.  If you had, 
-say, three machines, then you could run `clum` using 0/3, 1/3, and 2/3 as 
-the values supplied to `--bins` and the work will be evenly split without
-the need for any fuss.
-
-You may be wondering how `clum` decides which arguments to run in each bin.
-In fact, consistently dividing the work without duplicating or missing any calls
-relies on two assumptions about the arguments iterable:
-
-	Repeated iterations should yield
-	 1. The same elements,
-	 2. in the same order.
-
-If that isn't the case, you need to use the `key` option to activate binning
-based on the particular arguments themselves, which will stabalize the binning,
-as described in "Binning ustable iterables".
-
-### `cluf` creates PBS scripts
-
-When you run `cluf` it splits the work across machines by writing a PBS job
-script for each machine, and then it submits those job scripts to the cluster
-scheduler using qsub.
-
-Each job script is just a regular shell script which you could run manually,
-instead of submitting to the scheduler, if you wanted to.  In fact, it's
-useful to use `cluf` to generate the scripts without submitting them, so that
-you can test-run one of them.  To generate the scripts without submitting them,
-do this:
-
-```bash
-$ cluf example -n4 -no-q	# you can also do -q
-```
-
-Whether or not the scripts are submitted, they are (by default) written to 
-the current working directory.  You may not want to clutter your source code
-directory with those scripts, so if you want to specify a different directory,
-use the `--jobs-dir` or `-j` option, and provide the path to the directory
-where the job scripts should be written.
-
-There are a lot of options that can be specified in the job scripts that
-controls how the scheduler will handle them.  For example, you can indicate
-that you want a machines with a certain number of nodes, a cretain amount of
-memory, or which have gpus available.  It's outside of the scope of the tool
-to review all of the different PBS options available, but you can easily set 
-any of them without getting your hands dirty -- see "Setting PBS options" below.
-
-If you're new to qsub and PBS, read about it.  But for now, be aware that you 
- can view the status of your jobs (and thier ids) by running
-
-```bash
-$ qstat | grep <your-username>
-```
-
-And you can delete a job by doing
-
-```bash
-$ qdel <job-id>
-```
 
 Thee commands are also outside of the scope of this tool, but are provided here
 as a handy bare minimum to start mucking about with running jobs on a cluster.
