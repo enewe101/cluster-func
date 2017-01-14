@@ -28,12 +28,14 @@ and error-prone.  Let's never do it again.
 on many different arguments.  This kind embarassingly parallelizable problem
 comes up pretty often.  At it's minimum, a solution involves defining
 A) the function to be repeatedly called, and B) all of the different arguments
-on which it should be called.  Cluster-func assumes that you have defined
-these in the form of a callable and an iterable within a python script, and
+on which it should be called.  
+
+Cluster-func assumes that you have defined
+these in the form of a *callable* and an *iterable* within a python script, and
 then it handles the business of spreading the work across cores and machines.
 
-The tool has two modes.  In "direct mode", it runs your function on the cpus of
-a single machine.  In "dispatch mode", it breaks the work into subjobs that can
+The tool has two modes.  In **direct mode**, it runs your function on the cpus of
+a single machine.  In **dispatch mode**, it breaks the work into subjobs that can
 be run on separate machines, and optionally submits them to a job scheduler
 using `qsub`.
 
@@ -42,7 +44,7 @@ This command:
 ```bash
 $ cluf my_script.py 
 ``` 
-will look in my_script.py for a function called `target` and an iterable called
+will look in `my_script.py` for a function called `target` and an iterable called
 `args`, and it will run `target` on every single value yielded from `args`,
 spawning as many workers as there are cpu cores available to your user on the
 machine.  
@@ -121,9 +123,12 @@ $ cluf my_script --bin=0/3		# short option: -b
 Would run `cluf` in direct mode, but only execute iterations falling into bin 0 
 out of 3, i.e., iterations 0, 3, 6, 9, etc.  (Bins are zero-indexed.)
 
-This means you can use the `--bin` option to spread work over multiple machines
+This means that if you're machines aren't part of a cluster that uses qsub, 
+you can use the `--bin` option to spread work over multiple machines
 by logging into each machine and running `cluf` in direct mode using different
-bins.  You can also do multiple bins in one subjob, For example,
+bins.  
+
+If you like, you can assign multiple bins to one subjob, For example, the option
 `--bins=0-2,5/10` will assign bins 0, 1, 2, and 5 (out of a total of 10 bins).
 
 ### If your iterable is not stable
