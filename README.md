@@ -277,41 +277,28 @@ cluf_options = {
 }
 ```
 
-However there are three special option whose names differ from the 
+However there are three special options whose names differ from the 
 PBS option names slightly.  These options are also set by default.
 
 - `'name'`: the name of your subjobs as they appear in the job scheduler.
-	this is also used to name your subjob scripts.  The default is the 
+	This is also used to name your subjob scripts.  The default is the 
 	format string `'{target_module}-{node_num}-{nodes}'`.  If you override
 	this you can also use those format fields, and you must at least use
 	the `{node_num}` field to ensure that each of your subjobs gets a 
-	unique name (otherwise the subjob scripts will overwrite one another.
+	unique name (otherwise the subjob scripts will overwrite one another).
 - `'stdout'`: the path at which to place stdout captured from your subjobs,
 	relative to the `jobs_dir` if set (if not set it defaults to the current
 	working directory).
 	The default is `'{target_module}-{node_num}-{nodes}.stdout'`
-	As for name, if you override this, make sure that the paths for subjobs
+	As for the `'name'` option, 
+	if you override this, make sure that the paths for subjobs
 	are unique by using the `{node_num}` field somewhere.
-- `'stderr'`: similar to stdout.  Defaults to 
+- `'stderr'`: similar to `'stdout'`.  Defaults to 
 	`'{target_module}-{node_num}-{nodes}.stderr'`
 
 The combinations of PBS options that are available and/or required depends on 
-the setup of your cluster.
-
-There are three PBS options that are set by default, unless you specifically
-override them.  These determine the name of your subjobs within the scheduler and
-where stdout and stderr, captured for each subjob, should be written to disk.
-
-	1. The name of your subjobs defaults to the following format
-	`'{target_module}-{node_num}-{nodes}'`, with the fields being filled in for
-	each subjob.  You can choose a different naming scheme and make use of those
-	fields within it.  Be sure that your naming scheme yields different names for
-	different subjobs (i.e. you should at least make use of `{node_num}`
-	somewhere).  The naming of subjob scripts that are output are based on this
-	name, with `'.pbs'` appended afterward, so if the subjob names aren't unique,
-	then the subjob scripts will overwrite one another.
-
-	2. T
+the setup of your cluster.  Usually a system is configured with smart defaults
+so that you can queue simple jobs without setting any PBS options.
 
 
 ### Additional statements
