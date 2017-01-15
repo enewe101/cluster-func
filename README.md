@@ -72,14 +72,14 @@ The main use of dispatch mode is to spread the work in a cluster that
 uses the `qsub` command for job submission.  But you can still use `cluf` to 
 spread work between machines don't use `qsub`.
 
-Batch mode is implicitly invoked when you specify a number of compute nodes to 
-use.  This command:
+Dispatch mode is implicitly invoked when you specify a number of compute nodes
+to use.  This command:
 ```bash
 $ cluf my_script.py --nodes=10 --queue	# short options -n, -q
 ```
 will break the work into 10 subjobs, and submit them using qsub.  It does
-this by writing small shell scripts that each call the target function on a
-subset of the arguments yielded by the iterable.
+this by writing small shell scripts, each of which is responsible for calling 
+the target function on a subset of the arguments yielded by the iterable.
 
 (Each shell script has Portable Batch System (PBS) directives that cause the
 stdout and stdin to be captured into files by the same name (but with
