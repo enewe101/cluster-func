@@ -239,14 +239,15 @@ as keys and values as, well, values:
 (in `my_script.py`)
 ```python
 cluf_options = {
-	...
 	'env': {'MYENV': 1}
 }
 ```
 
 (in `~/.clufrc`)
 ```json
-{ ... "env": {"MYENV": 1}}
+{
+	"env": {"MYENV": 1}
+}
 ```
 
 Setting the env option using either method shown will cause the given environment
@@ -335,7 +336,7 @@ optional arguments:
                         the beginning of subjob scripts, being executed before
                         running the subjob. You can include multiple comma-
                         separated paths. This option only takes effect in
-                        dispatch mode
+                        dispatch mode.
   -A APPEND_SCRIPT, --append-script APPEND_SCRIPT
                         Path to a script whose contents should be included at
                         the end of subjob scripts, being executed after the
