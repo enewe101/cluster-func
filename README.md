@@ -201,6 +201,7 @@ cluf_options = {
 	'nodes': 12,
 	'queue': True		# Flag options set using using boolean
 }
+```
 
 **Using `.clufrc`**
 (in `~/.clufrc`)
