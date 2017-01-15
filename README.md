@@ -100,13 +100,13 @@ want write your iterable that way, see **How work is divided** for other options
 
 ## Arguments iterable
 The main usecase imagined is one where the arguments iterable yields either
-single bare arguments, or lists of positional arguments that should be used to 
-invoke the target function.  Of course, the python language provides a very
+single bare arguments, or tuples of positional arguments.  Of course, the Python 
+language provides a very
 flexible way of calling functions, allowing you to mix positional arguments
 and keyword arguments.  If you need that flexibility, then set up your iterator
-to yield `cluster_func.Arguments` objects.  This class acts as a proxy, so that
-when you can call it in exactly the way that you would like to call your
-target function.
+to yield `cluster_func.Arguments` objects.  This class acts as a proxy, and 
+will be used to call your target function in exactly the way you called the 
+`Arguments` constructor.
 
 Here is the `Arguments` class in action:
 ```python
