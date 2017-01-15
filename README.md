@@ -323,8 +323,9 @@ cluf_options = {
 }
 ```
 
-However there are three special options whose names differ from the 
-PBS option names slightly.  These options are also set by default.
+There are three special options whose names differ from the 
+PBS option names slightly, and options are set to defaults unless specifically
+overridden.
 
 - `'name'`: the name of your subjobs as they appear in the job scheduler.
 	This is also used to name your subjob scripts.  The default is the 
