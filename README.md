@@ -111,9 +111,9 @@ will be used to call your target function in exactly the way you called the
 Here is the `Arguments` class in action:
 ```python
 >>> from cluster_func import Arguments
->>> my_args = Arguments(1, *[3,4,5], six=6, **{'seven':7, 'eight':8})
+>>> my_args = Arguments(0, *[1,2,3], four=4, **{'five':5, 'six':6})
 >>> my_args
-Arguments(1, 3, 4, 5, seven=7, six=6, eight=8)
+Arguments(0, 1, 2, 3, four=4, five=5, six=6)
 >>>
 >>> # Your target function will be called like this
 >>> my_target(*my_args.args, **my_args.kwargs)
