@@ -328,7 +328,8 @@ PBS option names slightly, and options are set to defaults unless specifically
 overridden.
 
 - `'name'`: the name of your subjobs as they appear in the job scheduler.
-	This is also used to name your subjob scripts.  The default is the 
+	This is also used to name your subjob scripts (by appending `'.pbs'`.  
+	The default is the 
 	format string `'{target_module}-{node_num}-{nodes}'`.  If you override
 	this you can also use those format fields, and you must at least use
 	the `{node_num}` field to ensure that each of your subjobs gets a 
