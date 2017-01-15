@@ -53,7 +53,7 @@ from iterable_queue import IterableQueue
 
 # From this package
 import utils
-from exceptions import OptionError
+from exceptions import OptionError, RCFormatError
 from arg_parser import ClufArgParser
 
 # Constants
@@ -66,13 +66,14 @@ DEFAULT_PBS_OPTIONS = {
 	'name': '{target}-{node_num}-{nodes}',
 }
 DEFAULT_CLUF_OPTIONS = {
-	'target-func-name': 'target', 
-	'argument-iterable-name': 'args',
+	'target_func_name': 'target', 
+	'argument_iterable_name': 'args',
 	'these_bins': [0],
 	'num_bins': 1,
 	'queue': True, 
 	'target_cli': [],
-	'env': {}
+	'env': {},
+	'processes': utils.cpus()
 }
 NON_CLI_OPTIONS = ['prepend_statements', 'append_statements']
 	 
@@ -86,17 +87,20 @@ cd {current_directory}
 
 # Load the RC_PARAMS (if the user has a .clufrc file).
 try:
-	RC_PARAMS = utils.normalize_options(
-		json.loads(open(os.path.expanduser('~/.clufrc')).read())
-	)
+	RC_PARAMS = json.loads(open(os.path.expanduser('~/.clufrc')).read())
+	utils.normalize_options(RC_PARAMS)
 except IOError:
 	RC_PARAMS = {}
+except ValueError as e:
+	print '.clufrc: %s' % str(e)
+	sys.exit(1)
 
 # Validate the RC_PARAMS.  If there's an error, inform user it's in rc_file.
 try:
 	utils.validate_options(RC_PARAMS)
 except OptionError as e:
-	raise OptionError('.clufrc: %s' % str(e))
+	print '.clufrc: %s' % str(e)
+	sys.exit(1)
 
 
 
@@ -172,11 +176,19 @@ def find_module(target_module_path):
 
 
 def get_options(options, target_module):
+
+	# Get the module options
 	cluf_options = getattr(target_module, 'cluf_options', {})
+	utils.normalize_options(cluf_options)
+
+	print 'cluf_options', cluf_options
+
+	# Merge commandline options, module options, RC_PARAMS, and default options.
 	options = utils.merge_dicts(
 		options, cluf_options, RC_PARAMS, DEFAULT_CLUF_OPTIONS
 	)
-	utils.normalize_options(options)
+
+	# Validate the merged options
 	utils.validate_options(options)
 
 	return options
@@ -243,11 +255,11 @@ def dispatch(target_module_path, options):
 			created if it doesn't exist.  Default is the current working
 			directory.  
 
-		- target-func-name [str] - name of the target function.  It can actually 
+		- target_func_name [str] - name of the target function.  It can actually 
 			be an identifier for any callable in the module's namespace.
 			Default is to look for a callable called "target".
 
-		- argument-iterable-name [str] - name of the iterable that yields 
+		- argument_iterable_name [str] - name of the iterable that yields 
 			argument sets.  This iterable should yield tuples of arguments;
 			each tuple will be unpacked and passed as the arguments list to the
 			target function.  If an invocation involves a single argument, it
@@ -271,16 +283,17 @@ def dispatch(target_module_path, options):
 
 	# Resolve the options.  In `merge_dicts`, the left-more takes precedence.
 	options = get_options(options, target_module)
+	print options
 
 	# Get the target function and arguments iterable
-	argument_iterable = getattr(target_module, options['argument-iterable-name'])
-	target_func = getattr(target_module, options['target-func-name'])
+	argument_iterable = getattr(target_module, options['argument_iterable_name'])
+	target_func = getattr(target_module, options['target_func_name'])
 
 	# How many nodes will we use?  We might need to count the arguments iterable.
 	options['nodes'] = get_num_nodes(options, argument_iterable)
 
 	# Ensure the jobs dir exists.
-	ensure_exists(options['jobs_dir'])
+	utils.ensure_exists(options['jobs_dir'])
 
 	# Make each job script, and possibly enqueue it
 	for node_num in range(options['nodes']):
@@ -335,27 +348,24 @@ def resolve_options(
 
 def format_script(target_module_name, node_num, options):
 
-	# TODO: additional statements should be able to be specified in an rc file.
-	#	or read from a path
+	# Work out pbs statements for this job
+	pbs_option_statements = format_pbs_statements(
+		target_module_name, node_num, options
+	)
 
 	# Get any additional statements to prepend
 	prepend_statements = [
-		open(script).read() for script in options['prepend_scripts']
+		open(script).read() for script in options['prepend_script']
 	]
 	prepend_statements.extend(options['prepend_statements'])
 	prepend_statements = '\n'.join(prepend_statements)
 
 	# Get any additional statements to append
 	append_statements = [
-		open(script).read() for script in options['append_scripts']
+		open(script).read() for script in options['append_script']
 	]
 	append_statements.extend(options['append_statements'])
 	append_statements = '\n'.join(append_statements)
-
-	# Work out pbs statements for this job
-	pbs_option_statements = format_pbs_statements(
-		target_module_name, node_num, options
-	)
 
 	command = format_command_statement(target_module_name, node_num, options)
 
@@ -381,9 +391,10 @@ def format_command_statement(target_module_name, node_num, options):
 	command_tokens.extend([
 		'cluf',
 		target_module_name,
+		'-m', 'direct',
 		'-b', '%s/%s' % (node_num, options['nodes']),
-		'-t', options['target-func-name'],
-		'-a', options['argument-iterable-name'],
+		'-t', options['target_func_name'],
+		'-a', options['argument_iterable_name'],
 	])
 
 	# Add the processors option if any
@@ -398,9 +409,10 @@ def format_command_statement(target_module_name, node_num, options):
 	return ' '.join(command_tokens)
 
 
-def get_num_nodes(argument_iterable, options):
+def get_num_nodes(options, argument_iterable):
 
 	# If nodes was explicitly provided as an option, use that
+	print 'OPTIONS SEEN IN GETNUMNODES', options
 	if 'nodes' in options:
 		return options['nodes']
 
@@ -461,7 +473,7 @@ def format_pbs_statements(target_module_name, node_num, options):
 
 	# Many pbs parameters are specified using a generic statement format.
 	# Identify the parameters that need to be handled separately.
-	non_generic_params = {'ppn', 'stdout', 'stderr', 'name' }
+	non_generic_params = {'ppn', 'stdout', 'stderr', 'name'}
 
 	# First format the generic parameters
 	pbs_option_statements = [
@@ -563,11 +575,11 @@ def run( target_module_path, options
 		spawned for repeated execution of the target function.  By default
 		this is equal to the number of cpus available on the machine.
 
-	* target-func-name [str] - name of the target function.  It can actually be
+	* target_func_name [str] - name of the target function.  It can actually be
 		an identifier for any callable in the module's namespace.  Default is
 		to look for a callable called "target".
 
-	* argument-iterable-name [str] - name of the iterable that yields argument
+	* argument_iterable_name [str] - name of the iterable that yields argument
 		sets.  This iterable should yield tuples of arguments; each tuple will
 		be unpacked and passed as the arguments list to the target function.
 		If an invocation involves a single argument, it need not be within a 
@@ -593,8 +605,8 @@ def run( target_module_path, options
 	options = get_options(options, module)
 
 	# Get the target function and arguments iterable.
-	target_func = getattr(module, options['target-func-name'])
-	iterable = getattr(module, options['argument-iterable-name'])
+	target_func = getattr(module, options['target_func_name'])
+	iterable = getattr(module, options['argument_iterable_name'])
 
 	# What we call the "iterable" may be an iterable or a callable that yields
 	# an iterable.  Resolve that now.

@@ -4,12 +4,15 @@ import re
 import subprocess
 from exceptions import OptionError
 
-
-NORMALIZED_OPTIONS = {
-	'jobs-dir', 'target-func-name', 'argument-iterable-name',
-	'queue', 'processes', 'env', 'prepend-script', 'append-script',
-	'prepend-statements', 'append-statements', 'hash', 'key', 'nodes',
-	'iterations', 'these_bins', 'num_bins', 'target_cli'
+CLI_ONLY_OPTIONS = {
+	'mode', 
+}
+NORMALIZED_NON_CLI_OPTIONS = {
+	'jobs_dir', 'target_func_name', 'argument_iterable_name',
+	'queue', 'processes', 'env', 'prepend_script', 'append_script',
+	'prepend_statements', 'append_statements', 'hash', 'key',
+	'these_bins', 'num_bins', 'target_cli',
+	'nodes', 'iterations', 'pbs_options'
 }
 
 
@@ -197,27 +200,33 @@ def normalize_options(options):
 	# Rename some keys.  Though user-friendly, these keys will become confusing 
 	# deeper within the handling of the command.
 	if 'target' in options:
-		options['target-func-name'] = options.pop('target')
+		options['target_func_name'] = options.pop('target')
 	if 'args' in options:
-		options['argument-iterable-name'] = options.pop('args')
+		options['argument_iterable_name'] = options.pop('args')
 	if 'target_module' in options:
 		options['target_module_path'] = options.pop('target_module')
 
 	# Parse the bins option, replacing it with "these_bins" and "num_bins"
 	if 'bins' in options:
 		this_bin, num_bins = options.pop('bins').split('/')
-		these_bins = utils.unfurl(this_bin)
+		these_bins = unfurl(this_bin)
 		num_bins = int(num_bins)
 		options['these_bins'] = these_bins
 		options['num_bins'] = num_bins
 
-	# Unfurl the scripts listings if any
-	if 'prepend-script' in options:
-		options['prepend-script'] = options['prepend-script'].split(',')
+	# Unfurl the scripts listings (if any) if needed.
+	if 'prepend_script' in options:
+		if isinstance(options['prepend_script'], basestring):
+			options['prepend_script'] = options['prepend_script'].split(',')
 
 	# Unfurl the scripts listings if any
-	if 'append-script' in options:
-		options['prepend-script'] = options['prepend-script'].split(',')
+	if 'append_script' in options:
+		if isinstance(options['append_script'], basestring):
+			options['append_script'] = options['append_script'].split(',')
+
+	# Convert hash option into a list
+	if 'hash' in options and isinstance(options['hash'], basestring):
+		options['hash'] = unfurl(options['hash'])
 
 	# Convert env dictionary into a string
 	if 'env' in options and not isinstance(options['env'], basestring):
@@ -231,7 +240,12 @@ def validate_options(options):
 
 	# Raise an error if we see an unexpected option
 	for option in options:
-		if option not in NORMALIZED_OPTIONS:
+		if option not in NORMALIZED_NON_CLI_OPTIONS:
+			if option in CLI_ONLY_OPTIONS:
+				raise OptionError(
+					'`%s` option can only be specified on the command line.'
+					% option
+				)
 			raise OptionError('Unrecognized option: %s' % option)
 
 	# Raise on error if we see conflicting options

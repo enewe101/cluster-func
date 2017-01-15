@@ -3,4 +3,7 @@
 class OptionError(ValueError):
 	pass
 
+class RCFormatError(ValueError):
+	pass
+
 

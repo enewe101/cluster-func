@@ -253,6 +253,67 @@ cluf_options = {
 Setting the env option using either method shown will cause the given environment
 variables to be set within each of the subjob scripts.
 
+### PBS options
+Portable Batch System options control how the cluster scheduler schedules your
+job, and allows you to request specific compute resources and specify the
+amount of time that your job should run.  For example, to request that your
+jobs run on compute nodes with at least 4 cpu cores and 2 gpus, you can do
+something like this:
+
+In general pbs options should be set using a dictionary of key-value pairs
+using the option name as the key:
+
+(in `my_script.py`)
+```python
+cluf_options = {
+	'pbs_options': {'cpus': 4, 'gpus': 2}
+}
+```
+
+(in `~/.clufrc`)
+```json
+{
+	"pbs_options": {"cpus": 4, "gpus": 2}
+}
+```
+
+However there are three special option whose names differ from the 
+PBS option names slightly.  These options are also set by default.
+
+	- `'name'`: the name of your subjobs as they appear in the job scheduler.
+		this is also used to name your subjob scripts.  The default is the 
+		format string `'{target_module}-{node_num}-{nodes}'`.  If you override
+		this you can also use those format fields, and you must at least use
+		the `{node_num}` field to ensure that each of your subjobs gets a 
+		unique name (otherwise the subjob scripts will overwrite one another.
+	- `'stdout'`: the path at which to place stdout captured from your subjobs,
+		relative to the `jobs_dir` if set (if not set it defaults to the current
+		working directory).
+		The default is `'{target_module}-{node_num}-{nodes}.stdout'`
+		As for name, if you override this, make sure that the paths for subjobs
+		are unique by using the `{node_num}` field somewhere.
+	- `'stderr'`: similar to stdout.  Defaults to 
+		`'{target_module}-{node_num}-{nodes}.stderr'`
+
+The combinations of PBS options that are available and/or required depends on 
+the setup of your cluster.
+
+There are three PBS options that are set by default, unless you specifically
+override them.  These determine the name of your subjobs within the scheduler and
+where stdout and stderr, captured for each subjob, should be written to disk.
+
+	1. The name of your subjobs defaults to the following format
+	`'{target_module}-{node_num}-{nodes}'`, with the fields being filled in for
+	each subjob.  You can choose a different naming scheme and make use of those
+	fields within it.  Be sure that your naming scheme yields different names for
+	different subjobs (i.e. you should at least make use of `{node_num}`
+	somewhere).  The naming of subjob scripts that are output are based on this
+	name, with `'.pbs'` appended afterward, so if the subjob names aren't unique,
+	then the subjob scripts will overwrite one another.
+
+	2. T
+
+
 ### Additional statements
 You can also specify any additional statements that you want to appear in your
 job script.  This gives you more flexibility than simply setting environment 
@@ -272,13 +333,13 @@ The `cluf` command has lots of options, which can be specified in three
 different places:
 
  1. as command line arguments, or
- 2. within your target module, inside a dictionary called clum_options, or
+ 2. within your target module, inside a dictionary called cluf_options, or
  3. in the `~/.clufrc` file, in the form of a JSON object
 
 These locations are in decreasing order of precedence, i.e. the command line
 overrides all other options, and the `.clufrc` file doesn't override the others.
 
-Options given in the `clum_options` dictionary in the target module or in the
+Options given in the `cluf_options` dictionary in the target module or in the
 `.clufrc` JSON object should be identified by the long option name, without
 the leading '--'.
 

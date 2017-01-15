@@ -39,14 +39,14 @@ class ClufArgParser(object):
 			)
 		)
 		parser.add_argument(
-			'-t', '--target', default='target',
+			'-t', '--target',
 			help=(
 				'Alternate name for the target callable to be invoked '
 				'repeatedly.  Default is "target".'
 			)
 		)
 		parser.add_argument(
-			'-a', '--args', default='args', 
+			'-a', '--args',
 			help='Alternate name for the arguments iterable.  Default is "args".'
 		)
 		parser.add_argument(
@@ -57,8 +57,7 @@ class ClufArgParser(object):
 			)
 		)
 		parser.add_argument(
-			'-p', '--processes', type=int, default=utils.cpus(),
-			help='Number of processors to use.'
+			'-p', '--processes', type=int, help='Number of processors to use.'
 		)
 		parser.add_argument(
 			'-b', '--bins', 
@@ -106,7 +105,9 @@ class ClufArgParser(object):
 		parser.add_argument(
 			'-m', '--mode', choices=('dispatch', 'direct'),
 			help=(
-				'Explicitly set the mode of operation.  Can be set to "direct" '
+				'Explicitly set the mode of operation.  '
+				'This option can only be set on the command line.  '
+				'Can be set to "direct" '
 				'or "dispatch".  In direct mode the job is run, whereas in '
 				'dispatch mode a script for the job(s) is created and '
 				'optionally enqueued. Setting either -n or -i implicitly sets '
@@ -114,6 +115,10 @@ class ClufArgParser(object):
 				'otherwise.'
 			)
 		)
+		parser.add_argument(
+			'-o', '--pbs-options', help=(
+				'Set the PBS options.'
+			)
 
 		# Only one of the the optional arguments that determine the argument(s) on 
 		# which to base binning cannot both be set.
@@ -148,7 +153,8 @@ class ClufArgParser(object):
 			'-n', '--nodes', type=int, 
 			help=(
 				'Number of compute nodes.  This option causes the command to '
-				'operate in dispatch mode, unless the mode is explicitly set'
+				'operate in dispatch mode, unless the mode is explicitly set.  '
+				'This option can only be set on the command line.'
 			)
 		)
 		group.add_argument(
@@ -159,7 +165,8 @@ class ClufArgParser(object):
 				'unless the mode is explicitly set.  Note that '
 				'using this instead of --nodes (-n) can lead to delay because '
 				'the total number of iterations has to be counted to '
-				'determine the number of compute nodes needed.'
+				'determine the number of compute nodes needed.  '
+				'This option can only be set on the command line.'
 			)
 		)
 
