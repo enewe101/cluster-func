@@ -286,7 +286,9 @@ the leading '--'.
 
 <pre>
 usage: cluf [-h] [-j JOBS_DIR] [-t TARGET] [-a ARGS] [-q] [-p PROCESSES]
-            [-b BINS] [-n NODES | -i ITERATIONS]
+            [-b BINS] [-e ENV] [-P PREPEND_SCRIPT] [-A APPEND_SCRIPT]
+            [-m {dispatch,direct}] [-x HASH | -k KEY]
+            [-n NODES | -i ITERATIONS]
             target_module
 
 Run a function many times on multiple processors and machines.
@@ -298,36 +300,81 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   -j JOBS_DIR, --jobs-dir JOBS_DIR
-                        Specify a directory in which to store jobscripts and
+                        Specify a directory in which to store job scripts and
                         the files generated from the stdout and stdin during
-                        job execution
+                        job execution. This directory will be made if it
+                        doesn't exist. This option only takes effect in
+                        dispatch mode.
   -t TARGET, --target TARGET
                         Alternate name for the target callable to be invoked
                         repeatedly. Default is "target".
   -a ARGS, --args ARGS  Alternate name for the arguments iterable. Default is
                         "args".
-  -q, --no-q            Do not enqueue the generated scripts using qsub.
-                        Default is to Enqueue them
+  -q, --queue           Enqueue the generated scripts using qsub. This option
+                        only takes effect in dispatch mode.
   -p PROCESSES, --processes PROCESSES
                         Number of processors to use.
-  -b BINS, --bins BINS  Optionally specify a partition of the work to be done.
+  -b BINS, --bins BINS  Optionally specify a portion of the work to be done.
                         Should take the form "x/y" meaning "do the x-th
                         section out of y total sections. For example, "0/2"
                         means divide the work into two halves, and do the
                         first (0th) half. Note that x and y should be
                         integers, and x should be from 0 to y-1 inclusive.
-                        Running for all values of x will perform all the work,
-                        and each run (each value of x) can be done on a
-                        separate machine.
+                        This option only takes effect in direct mode.
+  -e ENV, --env ENV     Provide environment variables that should be set when
+                        running sub-jobs. This is for use in dispatch mode,
+                        since job scripts will run in a different environment.
+                        In direct mode, the environment is inherited. The
+                        value of this option should be an enquoted string of
+                        space-separated key=value pairs. For example: $ cluf
+                        my_script -n 12 -e 'FOO=bar BAZ="fizz bang"'will set
+                        FOO equal to "bar" and BAZ equal to "fizz bang". This
+                        option only takes effect in dispatch mode.
+  -P PREPEND_SCRIPT, --prepend-script PREPEND_SCRIPT
+                        Path to a script whose contents should be included at
+                        the beginning of subjob scripts, being executed before
+                        running the subjob. You can include multiple comma-
+                        separated paths. This option only takes effect in
+                        dispatch mode
+  -A APPEND_SCRIPT, --append-script APPEND_SCRIPT
+                        Path to a script whose contents should be included at
+                        the end of subjob scripts, being executed after the
+                        subjob completes. You can include multiple comma-
+                        separated paths. This option only takes effect in
+                        dispatch mode.
+  -m {dispatch,direct}, --mode {dispatch,direct}
+                        Explicitly set the mode of operation. Can be set to
+                        "direct" or "dispatch". In direct mode the job is run,
+                        whereas in dispatch mode a script for the job(s) is
+                        created and optionally enqueued. Setting either -n or
+                        -i implicitly sets the mode of operation to
+                        "dispatch", unless specified otherwise.
+  -x HASH, --hash HASH  Specify an argument or set of arguments to be used to
+                        determine which bin an iteration belons in. These
+                        arguments should have a stable string representation
+                        (i.e. no unordered containers or memory addresses) and
+                        should be unique over the argumetns iterable. This
+                        should only be set if automatic binning won't work,
+                        i.e. if your argument iterable is not stable.
+  -k KEY, --key KEY     Integer specifying the positional argument to use as
+                        the bin for each iteration. That key argument should
+                        always take on a value that is an integer between 0
+                        and num_bins-1. This should only be used if you really
+                        need to control binning. Prefer to rely on automatic
+                        binning (if your iterable is stable), or use the
+                        -xoption, which is more flexible and less error-prone.
   -n NODES, --nodes NODES
-                        Number of compute nodes.
+                        Number of compute nodes. This option causes the
+                        command to operate in dispatch mode, unless the mode
+                        is explicitly set
   -i ITERATIONS, --iterations ITERATIONS
                         Approximate number of iterations per compute node.
-                        Note that using this instead of --nodes (-n) can lead
-                        to delay because the number total number of iterations
-                        has to be counted before dispatching in order to
-                        determine the number of compute nodes needed.
-
+                        This option causes the command to operate in dispatch
+                        mode, unless the mode is explicitly set. Note that
+                        using this instead of --nodes (-n) can lead to delay
+                        because the total number of iterations has to be
+                        counted to determine the number of compute nodes
+                        needed.
 </pre>
 
 
