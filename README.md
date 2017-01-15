@@ -63,9 +63,9 @@ or to use a different number of worker processes, do this:
 $ cluf my_script.py --target=my_func --args=my_iterable --processes=12	# short options -t, -a, -p
 ```
 
-This means you can multiprocess any script without pools or queues or even
-importing multiprocessing.  But, if you really need to scale up, then you'll
-want to use the dispatch mode.
+So, using `cluf` in direct mode lets you multiprocess any script without pools
+or queues or even importing multiprocessing.  But, if you really need to scale
+up, then you'll want to use the dispatch mode.
 
 ### Dispatch mode
 The main use of dispatch mode is to spread the work in a cluster that
@@ -253,7 +253,7 @@ cluf_options = {
 Setting the env option using either method shown will cause the given environment
 variables to be set within each of the subjob scripts.
 
-# Additional statements
+### Additional statements
 You can also specify any additional statements that you want to appear in your
 job script.  This gives you more flexibility than simply setting environment 
 variables.   You can include statements before the subjob is run using
