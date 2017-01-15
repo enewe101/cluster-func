@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 '''
 This submodule defines core functionality of the cluster-func module.  The two
 most prominent functions are `dispatch` and `do_this`, whose purposes are
@@ -44,7 +43,7 @@ import os
 import sys
 import imp
 import math
-import argparse
+import json
 from inspect import getargspec
 from subprocess import check_output
 from multiprocessing import Process
@@ -54,6 +53,8 @@ from iterable_queue import IterableQueue
 
 # From this package
 import utils
+from exceptions import OptionError
+from arg_parser import ClufArgParser
 
 # Constants
 DEFAULT_PBS_OPTIONS = {
@@ -65,19 +66,16 @@ DEFAULT_PBS_OPTIONS = {
 	'name': '{target}-{node_num}-{nodes}',
 }
 DEFAULT_CLUF_OPTIONS = {
-	'target_func_name':'target', 
-	'argument_iterable_name':'args',
-	'these_bins'=[0],
-	'num_bins'=1,
-	'queue':True, 
-	'target_cli'=[],
-	'additional_statements': [],
+	'target-func-name': 'target', 
+	'argument-iterable-name': 'args',
+	'these_bins': [0],
+	'num_bins': 1,
+	'queue': True, 
+	'target_cli': [],
 	'env': {}
 }
-
-
+NON_CLI_OPTIONS = ['prepend_statements', 'append_statements']
 	 
-
 DEFAULT_GUILLIMIN_MODULES	= ['Python/2.7.10']
 TEMPLATE = '''#!/bin/bash
 {pbs_option_statements}
@@ -86,14 +84,23 @@ cd {current_directory}
 {command}
 '''
 
-# Custom exception.  Used for errors in the inputs to `main`, `dispatch`, `do`,
-# and `do_this`, when they can be found early.
-class BadArguments(Exception):
-	pass
+# Load the RC_PARAMS (if the user has a .clufrc file).
+try:
+	RC_PARAMS = utils.normalize_options(
+		json.loads(open(os.path.expanduser('~/.clufrc')).read())
+	)
+except IOError:
+	RC_PARAMS = {}
+
+# Validate the RC_PARAMS.  If there's an error, inform user it's in rc_file.
+try:
+	utils.validate_options(RC_PARAMS)
+except OptionError as e:
+	raise OptionError('.clufrc: %s' % str(e))
 
 
-# One of the two entry points for using the functionality in this module.
-# The other is `do`.
+
+# Entry points for handling the `cluf` command.
 def main():
 	'''
 	Possible entry point, used by the `cluster-func` command.  Parses command
@@ -111,214 +118,29 @@ def main():
 
 	# In this block we can catch early problems with command line arguments
 	# that are supplied, and print a friendlier message to the user
+	parser = ClufArgParser()
 	try:
 
-		# Parse arguments
-		mode, args = parse_args()
+		# Parse arguments, pull out the running mode and the target module.
+		args = parser.parse_args()
+		mode = args.pop('mode')
 		target_module_path = args.pop('target_module_path')
 
 		# Run the function with the arguments
 		if mode == 'dispatch':
 			dispatch(target_module_path, args)
-		elif mode == 'run':
+		elif mode == 'direct':
 			run(target_module_path, args)
 		else:
-			raise BadArgument('Unexpected mode: %s' % mode)
+			raise OptionError('Unexpected mode: %s' % mode)
 
 	# Handle errors by printing error message followed by the usage
-	except BadArguments, e:
+	except OptionError, e:
+		raise
 		print '\n%s\n' % str(e)
-		parse_args(['-h'])
+		parser.print_usage()
 
 
-def parse_args(args=sys.argv[1:]):
-	'''
-	Parses the command line arguments for the `cluf` command.
-	'''
-
-	# First set up the argument parser
-	parser = argparse.ArgumentParser(description=(
-		'Run a function many times on multiple processors and machines.'
-	))
-
-	# Add the only required positional argument.
-	parser.add_argument(
-		'target_module', 
-		help=(
-			'path to the python module that contains the target function to '
-			'be run many times.'
-		)
-	)
-
-	# Add various optional arguments.
-	parser.add_argument(
-		'-j', '--jobs-dir',
-		help=(
-			'Specify a directory in which to store job scripts and the files '
-			'generated from the stdout and stdin during job execution.  This '
-			"directory will be made if it doesn't exist."
-		)
-	)
-	parser.add_argument(
-		'-t', '--target', default='target',
-		help=(
-			'Alternate name for the target callable to be invoked repeatedly.  '
-			'Default is "target".'
-		)
-	)
-	parser.add_argument(
-		'-a', '--args', default='args', 
-		help='Alternate name for the arguments iterable.  Default is "args".'
-	)
-	parser.add_argument(
-		'-q', '--queue', action='store_true', default=None,
-		help=('Enqueue the generated scripts using qsub.')
-	)
-	parser.add_argument(
-		'-p', '--processes', type=int, default=utils.cpus(),
-		help='Number of processors to use.'
-	)
-	parser.add_argument(
-		'-b', '--bins', 
-		help=(
-			'Optionally specify a partition of the work to be done. '
-			'Should take the form "x/y" meaning "do the x-th section out of '
-			'y total sections.  For example, "0/2" means divide the work into '
-			'two halves, and do the first (0th) half.  Note that x and y should '
-			'be integers, and x should be from 0 to y-1 inclusive.  Running '
-			'for all values of x will perform all the work, and each run '
-			'(each value of x) can be done on a separate machine.'
-		)
-	)
-	parser.add_argument(
-		'-e', '--env',
-		help=(
-			'Provide environment variables that should be set when running '
-			'sub-jobs.  This is for use in dispatch mode, since job scripts '
-			'will run in a different environment.  In direct mode, the '
-			'environment is inherited.  The value of this option should be '
-			'an enquoted string of space-separated key=value pairs.  For '
-			'example:\n'
-			"\t$ cluf my_script -n 12 -e 'FOO=bar BAZ=\"fizz bang\"'"
-			'will set FOO equal to "bar" and BAZ equal to "fizz bang".'
-		)
-	)
-
-	# Only one of the the optional arguments that determine the argument(s) on 
-	# which to base binning cannot both be set.
-	group = parser.add_mutually_exclusive_group()
-	group.add_argument(
-		'-x', '--hash',
-		help=(
-			'Specify an argument or set of arguments to be used to determine '
-			'which bin an iteration belons in.  These arguments should have '
-			'a stable string representation (i.e. no unordered containers or '
-			'memory addresses) and should be unique over the argumetns '
-			"iterable.  This should only be set if automatic binning won't "
-			'work, i.e. if your argument iterable is not stable.'
-		)
-	)
-	group.add_argument(
-		'-k', '--key',
-		help=(
-			'Integer specifying the positional argument to use as the bin for '
-			'each iteration.  That key argument should always take on a value '
-			'that is an integer between 0 and num_bins-1.  This should only '
-			'be used if you really need to control binning.  Prefer to rely on '
-			'automatic binning (if your iterable is stable), or use the -x'
-			'option, which is more flexible and less error-prone.'
-		)
-	)
-
-	# The optional arguments that determine number of nodes / iterations per 
-	# node are mutually exlusive.
-	group = parser.add_mutually_exclusive_group()
-	group.add_argument(
-		'-n', '--nodes', type=int, help='Number of compute nodes.'
-	)
-	group.add_argument(
-		'-i', '--iterations', type=int, 
-		help=(
-			'Approximate number of iterations per compute node.  Note that '
-			'using this instead of --nodes (-n) can lead to delay because the '
-			'number total number of iterations has to be counted before '
-			'dispatching in order to determine the number of compute nodes '
-			'needed.'
-		)
-	)
-
-	# Parse the arguments.  
-	# By calling parse_known_args, we allow unrecognized args to be passed
-	# through to the target module's `sys.argv`.  This also gives the
-	# desireable behavior that command line arguments intended for the target
-	# module can be separated from those intended for `cluster-func` by a '--'
-	# token.
-	parsed_args, target_cli = parser.parse_known_args(args)
-
-	# Let the user see how the arguments were interpreted.
-	for k,v in vars(parsed_args).items():
-		print '%s = %s' % (k, v)
-
-	# Pack all the arguments into a dictionary, exclude args that are None
-	parsed_args = {
-		k: v
-		for k, v in vars(parsed_args).items()
-		if v is not None
-	}
-
-	# Put target_cli in `parsed_args`, and remove the '--' if any.
-	parsed_args['target_cli'] = [a for a in target_cli if a != '--']
-
-	# Determine the running mode -- are we dispatching work to nodes on a 
-	# compute cluster, or are we going to run the job locally?
-	if 'nodes' in parsed_args or 'iterations' in parsed_args:
-		mode = 'dispatch'
-	else:
-		mode = 'run'
-
-	# Replace 'bins' in dispatch args with parsed versions
-	if 'bins' in parsed_args:
-		this_bin, num_bins = parsed_args.pop('bins').split('/')
-		these_bins = utils.unfurl(this_bin)
-		num_bins = int(num_bins)
-		parsed_args['these_bins'] = these_bins
-		parsed_args['num_bins'] = num_bins
-
-	# Replace 'hash' in args with parsed version.
-	if 'hash' in parsed_args:
-		parsed_args['hash'] = utils.unfurl(parsed_args['hash'])
-
-	# Rename a few fields.  These names match the keyword arguments expected
-	# in the internals, but are less user-friendly
-	parsed_args['target_func_name'] = parsed_args.pop('target')
-	parsed_args['argument_iterable_name'] = parsed_args.pop('args')
-	parsed_args['target_module_path'] = parsed_args.pop('target_module')
-
-	# Do some validation.  Certain options should only be specified if we
-	# are running in dispatch mode
-	if mode == 'run':
-		if 'jobs_dir' in parsed_args:
-			raise BadArguments(
-				'The --jobs-dir (-j) option must be used with --nodes (-n) '
-				'or --iterations (-i)'
-			)
-		if 'queue' in parsed_args:
-			raise BadArguments(
-				'The --no-q (-q) option must be used with --nodes (-n) '
-				'or --iterations (-i)'
-			)
-
-	elif mode == 'dispatch':
-		if 'num_bins' in parsed_args:
-			raise BadArguments(
-				'The --bins (-b) option cannot be used with --nodes (-n) nor '
-				'--iterations (-i)'
-			)
-
-	else:
-		raise BadArguments('Unexpected mode.')
-
-	return mode, parsed_args
 
 
 def load_module(target_module_path):
@@ -349,8 +171,18 @@ def find_module(target_module_path):
 	return full_path, target_module_name, found_module
 
 
-def dispatch(target_module_path, options)
-):
+def get_options(options, target_module):
+	cluf_options = getattr(target_module, 'cluf_options', {})
+	options = utils.merge_dicts(
+		options, cluf_options, RC_PARAMS, DEFAULT_CLUF_OPTIONS
+	)
+	utils.normalize_options(options)
+	utils.validate_options(options)
+
+	return options
+
+
+def dispatch(target_module_path, options):
 	'''
 	Creates a set of scripts that, when run, will each perform a portion of
 	a large job.  The job is defined by the python module located at 
@@ -411,11 +243,11 @@ def dispatch(target_module_path, options)
 			created if it doesn't exist.  Default is the current working
 			directory.  
 
-		- target_func_name [str] - name of the target function.  It can actually 
+		- target-func-name [str] - name of the target function.  It can actually 
 			be an identifier for any callable in the module's namespace.
 			Default is to look for a callable called "target".
 
-		- argument_iterable_name [str] - name of the iterable that yields 
+		- argument-iterable-name [str] - name of the iterable that yields 
 			argument sets.  This iterable should yield tuples of arguments;
 			each tuple will be unpacked and passed as the arguments list to the
 			target function.  If an invocation involves a single argument, it
@@ -438,12 +270,11 @@ def dispatch(target_module_path, options)
 	target_module_name, target_module = load_module(target_module_path)
 
 	# Resolve the options.  In `merge_dicts`, the left-more takes precedence.
-	cluf_options = getattr(target_module, 'cluf_options', {})
-	options = merge_dicts(options, cluf_options, DEFAULT_CLUF_OPTIONS)
+	options = get_options(options, target_module)
 
 	# Get the target function and arguments iterable
-	argument_iterable = getattr(target_module, options['argument_iterable_name'])
-	target_func = getattr(target_module, options['target_func_name'])
+	argument_iterable = getattr(target_module, options['argument-iterable-name'])
+	target_func = getattr(target_module, options['target-func-name'])
 
 	# How many nodes will we use?  We might need to count the arguments iterable.
 	options['nodes'] = get_num_nodes(options, argument_iterable)
@@ -507,8 +338,19 @@ def format_script(target_module_name, node_num, options):
 	# TODO: additional statements should be able to be specified in an rc file.
 	#	or read from a path
 
-	# Get any additional statements
-	additional_statements = '\n'.join(options['additional_statements'])
+	# Get any additional statements to prepend
+	prepend_statements = [
+		open(script).read() for script in options['prepend_scripts']
+	]
+	prepend_statements.extend(options['prepend_statements'])
+	prepend_statements = '\n'.join(prepend_statements)
+
+	# Get any additional statements to append
+	append_statements = [
+		open(script).read() for script in options['append_scripts']
+	]
+	append_statements.extend(options['append_statements'])
+	append_statements = '\n'.join(append_statements)
 
 	# Work out pbs statements for this job
 	pbs_option_statements = format_pbs_statements(
@@ -532,24 +374,23 @@ def format_command_statement(target_module_name, node_num, options):
 	command_tokens = []
 
 	# Add environment variables if any
-	env_tokens = [
-		"%s='%s'" % (k,v) 
-		for k,v in options['env']	
-	]
-	command_tokens.extend(env_tokens)
+	if 'env' in options:
+		command_tokens.append(options['env'])
 
 	# Add the main part of the command
 	command_tokens.extend([
 		'cluf',
 		target_module_name,
 		'-b', '%s/%s' % (node_num, options['nodes']),
-		'-t', options['target_func_name'],
-		'-a', options['argument_iterable_name'],
+		'-t', options['target-func-name'],
+		'-a', options['argument-iterable-name'],
 	])
 
 	# Add the processors option if any
 	if 'ppn' in options['pbs_options']:
 		command_tokens.extend(['-p', str(options['pbs_options']['ppn'])])
+
+	# Place the pass-through command line args (if any) after a '--' separator
 	if len(options['target_cli']):
 		command_tokens.append('--')
 		command_tokens.extend(options['target_cli'])
@@ -565,7 +406,7 @@ def get_num_nodes(argument_iterable, options):
 
 	# Either 'nodes' or 'iterations' must be specified in the options
 	if 'iterations' not in options:
-		raise BadArguments(
+		raise OptionError(
 			'You must specify either the number of nodes or the '
 			'number of inputs per node.'
 		)
@@ -722,11 +563,11 @@ def run( target_module_path, options
 		spawned for repeated execution of the target function.  By default
 		this is equal to the number of cpus available on the machine.
 
-	* target_func_name [str] - name of the target function.  It can actually be
+	* target-func-name [str] - name of the target function.  It can actually be
 		an identifier for any callable in the module's namespace.  Default is
 		to look for a callable called "target".
 
-	* argument_iterable_name [str] - name of the iterable that yields argument
+	* argument-iterable-name [str] - name of the iterable that yields argument
 		sets.  This iterable should yield tuples of arguments; each tuple will
 		be unpacked and passed as the arguments list to the target function.
 		If an invocation involves a single argument, it need not be within a 
@@ -749,12 +590,18 @@ def run( target_module_path, options
 	module_name, module = load_module(target_module_path)
 
 	# Resolve the options.  In `merge_dicts`, the left-more takes precedence.
-	cluf_options = getattr(target_module, 'cluf_options', {})
-	options = merge_dicts(options, cluf_options, DEFAULT_CLUF_OPTIONS)
+	options = get_options(options, module)
 
 	# Get the target function and arguments iterable.
-	target_func = getattr(module, optins['target_func_name'])
-	iterable = getattr(module, options['argument_iterable_name'])
+	target_func = getattr(module, options['target-func-name'])
+	iterable = getattr(module, options['argument-iterable-name'])
+
+	# What we call the "iterable" may be an iterable or a callable that yields
+	# an iterable.  Resolve that now.
+	try:
+		iter(iterable)
+	except TypeError:
+		iterable = iterable()
 
 	# Make a queue on which to put arguments
 	args_queue = IterableQueue()
@@ -775,7 +622,7 @@ def run( target_module_path, options
 	args_producer.close()
 
 
-def pass_through_args(target_module_path, args)
+def pass_through_args(target_module_path, args):
 
 	"""
 	Resolve the file name of the name of the target module, and put
@@ -852,33 +699,43 @@ def generate_args_subset(iterable, options):
 	would be ambiguous).
 	"""
 
-	for i, args in enumerate(iterable):
-
-		# Handle single-argument invokation
-		if not isinstance(args, tuple):
-			args = (args,)
-
-		# However, if "key" is specified, then the key'th argument designates
-		# the bin
-		if 'key' in options:
-			if args[options['key']] in options['these_bins']:
-				yield args
-
-		# If "hash" is specified, then concatenate the string representations
-		# of each argument indexed in hash (which is a list of ints), and
-		# hash it to determine the bin.
-		if 'hash' in options:
-			hashable = ''.join([str(args[i]) for i in options['hash']])
+	# If "hash" is specified, then concatenate the string representations
+	# of each argument indexed in hash (which is a list of ints), and
+	# hash it to determine the bin.
+	if 'hash' in options:
+		for args in as_tuples(iterable):
+			hashable = ''.join([
+				str(args[i] if len(args) > i else None) 
+				for i in options['hash']
+			])
 			this_bin = utils.binify(hashable, options['num_bins'])
 			if this_bin in options['these_bins']:
 				yield args
 
-		# Work is split into num_bins -- each node (machine) processes it's
-		# own bin.  By default, work is dealt around to each bin in the 
-		# order that it is yielded
-		else:
+	# However, if "key" is specified, then the key'th argument designates
+	# the bin
+	elif 'key' in options:
+		for args in as_tuples(iterable):
+			if args[options['key']] in options['these_bins']:
+				yield args
+
+	# By default, work is dealt around to each bin in the order that it is
+	# yielded
+	else:
+		for i, args in enumerate(as_tuples(iterable)):
 			if i % options['num_bins'] in options['these_bins']:
 				yield args
+
+
+def as_tuples(iterable):
+	"""Ensure elements emerge wrapped in tuples."""
+	for item in iterable:
+		if isinstance(item, tuple):
+			yield item
+		else:
+			yield (item,)
+
+
 
 if __name__ == '__main__':
 	main()

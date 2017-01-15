@@ -2,6 +2,16 @@ import hashlib
 import os
 import re
 import subprocess
+from exceptions import OptionError
+
+
+NORMALIZED_OPTIONS = {
+	'jobs-dir', 'target-func-name', 'argument-iterable-name',
+	'queue', 'processes', 'env', 'prepend-script', 'append-script',
+	'prepend-statements', 'append-statements', 'hash', 'key', 'nodes',
+	'iterations', 'these_bins', 'num_bins', 'target_cli'
+}
+
 
 def cpus():
 	""" Number of available virtual or physical CPUs on this system, i.e.
@@ -175,3 +185,66 @@ def unfurl(string_representation):
 def ensure_exists(path):
 	if not os.path.exists(path):
 		os.makedirs(path)
+
+
+
+def normalize_options(options):
+	"""
+	Mutate the options dict, renaming some of the keys, and parsing the 
+	bins option.
+	"""
+
+	# Rename some keys.  Though user-friendly, these keys will become confusing 
+	# deeper within the handling of the command.
+	if 'target' in options:
+		options['target-func-name'] = options.pop('target')
+	if 'args' in options:
+		options['argument-iterable-name'] = options.pop('args')
+	if 'target_module' in options:
+		options['target_module_path'] = options.pop('target_module')
+
+	# Parse the bins option, replacing it with "these_bins" and "num_bins"
+	if 'bins' in options:
+		this_bin, num_bins = options.pop('bins').split('/')
+		these_bins = utils.unfurl(this_bin)
+		num_bins = int(num_bins)
+		options['these_bins'] = these_bins
+		options['num_bins'] = num_bins
+
+	# Unfurl the scripts listings if any
+	if 'prepend-script' in options:
+		options['prepend-script'] = options['prepend-script'].split(',')
+
+	# Unfurl the scripts listings if any
+	if 'append-script' in options:
+		options['prepend-script'] = options['prepend-script'].split(',')
+
+	# Convert env dictionary into a string
+	if 'env' in options and not isinstance(options['env'], basestring):
+		options['env'] = ' '.join([
+			"%s=%s" % (k,v) 
+			for k,v in options['env'].items()
+		])
+
+
+def validate_options(options):
+
+	# Raise an error if we see an unexpected option
+	for option in options:
+		if option not in NORMALIZED_OPTIONS:
+			raise OptionError('Unrecognized option: %s' % option)
+
+	# Raise on error if we see conflicting options
+	if 'hash' in options and 'key' in options:
+		raise OptionError('The `hash` and `key` options are mutually exclusive.')
+	if 'nodes' in options and 'iterations' in options:
+		raise OptionError(
+			'The `nodes` and `iterations` options are mutually exclusive.')
+
+
+def merge_dicts(*dictionaries):
+    merged = {}
+    for dictionary in reversed(dictionaries):
+        merged.update(dictionary)
+    return merged
+

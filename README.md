@@ -116,10 +116,10 @@ bin.  For example, this command:
 ```bash
 $ cluf my_script --bin=0/3		# short option: -b
 ```
-Would run `cluf` in direct mode, but only execute iterations falling into bin 0 
+would run `cluf` in direct mode, but only execute iterations falling into bin 0 
 out of 3, i.e., iterations 0, 3, 6, 9, etc.  (Bins are zero-indexed.)
 
-You can use this to start subjobs on machines manually if you like.
+You can use this to start subjobs manually if you like.
 You can assign multiple bins to one subjob, For example, the option
 `--bins=0-2,5/10` will assign bins 0, 1, 2, and 5 (out of a total of 10 bins).
 
@@ -133,34 +133,38 @@ There are two alernative ways to handle binning: using *argument hashing* and
 *direct assignment*.
 
 ### Argument hashing
-By specifying the `--hash` option, you can instruct `cluf` to hash one of the
-arguments to determine its bin.
+By specifying the `--hash` option, you can instruct `cluf` to hash one or more
+of the arguments to determine its bin.
 
-For example, doing
-
+For example, doing:
 ```bash
-$ cluf example --nodes=12 --hash=0		# or use -n and -x
+$ cluf example --nodes=12 --hash=0		# short options: -n and -x
 ```
 will instruct `cluf` to hash the first argument of each iteration to decide
-which bin the iteration belongs to.  Before hashing, `cluf` calls `str` on the
-argument (so for this purpose, lists are hashable).
+which bin the iteration belongs to.  
 
-To use this approach, it's important that the argument selected for hashing
-has a stable string representation that reflects its value, so passing
-objects that don't implement `__str__` won't work, both because their string
-representation doesn't reflect their value, and because their memory address
-appears within it, which will be different in each subjob.
+Before hashing, `cluf` calls `str` on the argument (so for this purpose, lists
+are hashable).  It's important that the argument selected for hashing has a
+stable string representation that reflects its value. Using objects that don't
+implement `__str__` won't work, both because their string representation
+doesn't reflect their value, and because their memory address appears within
+it, which will be different in each subjob.  However, for this purpose, a list
+would be considered "hashable" (provided it's individual elements are).  On the
+other hand, dict's and sets are not suitable, because they are unordered, so
+their string representation is not stable.  One approach is to simply provide
+one argument that is a unique ID, and select it for hashing.
 
-Ideally the argument selected for hashing should be unique throughout iteration,
-since repeated values will be assigned to the same subjob.  You can also specify
-combinations of arguments to be hashed, which are more likely to be unique.
+Ideally the argument selected for hashing should be unique throughout
+iteration, since repeated values would be assigned to the same subjob, but
+occaisional repetitions won't imbalance load much.  To help achieve uniqueness
+you can provide combinations of arguments to be hashed.
+
 For example, this:
 ```bash
-$ cluf example --nodes=12 --hash=0-2,5		# or use -n and -x
+$ cluf example --nodes=12 --hash=0-2,5		# short options: -n and -x
 ```
-will hash arguents 0,1,2, and 5.  Because each iteration can use a different
-number of arguments, if one of the hashed arguments is missing, it is considered
-equal to `None`.
+will hash arguents 0,1,2, and 5.  If any hashed arguments are missing in an 
+iteration, they are considered equal to `None`.
 
 ### Direct assignment
 A final method is to include an argument that explicitly specifies the
@@ -168,7 +172,7 @@ bin for each iteration.  To activate direct assignment, and to specify which
 argument should be interpreted as the bin, use `--key` option:
 
 ```bash
-$ cluf example --nodes=12 --key=2 		# or use -n and -k
+$ cluf example --nodes=12 --key=2 		# short options: -n and -k
 ```
 In the command above, argument 2 (the third argument) will be interpreted as
 the bin for each iteration.
@@ -178,26 +182,109 @@ error prone, and it makes it more difficult to change the number bins.  It also
 introduces job division logic into your script which `cluf` was designed to
 prevent.
 
+## `cluf_options` and `.clufrc`
+You can include a dictionary named `cluf_options` in your target script to
+control the behavior of `cluf`.  This can be more convenient than the command
+line if you have to set a lot of options, and helps to document the options
+you used.  You can also set options globally in a file at `~/.clufrc`. 
+
+`cluf_options` should be a dictionary whose keys are the long option names,
+and whose values are strings representing the option values as you would enter
+them on the command line.  `.clufrc` should be a valid JSON object, with the
+same key-value format.  See the following examples:
+
+**Using `cluf_options`**
+(in `my_script.py`)
+```python
+cluf_options = {
+	'hash': (0,1,2,5),	# Collection options set using iterable
+	'nodes': 12,
+	'queue': True		# Flag options set using using boolean
+}
+
+**Using `.clufrc`**
+(in `~/.clufrc`)
+```json
+{
+	"hash": [0,1,2,5], 	# Collection options set using Array
+	"nodes": 12,
+	"queue": True		# Flag options set using boolean
+}
+```
+*Don't forget that JSON requires double quotes around strings.* 
+
+For the most part, any option that can be set on the command line can be set in
+`cluf_options` and `.clufrc`, and vice versa, but there are a few options that
+can *only* be set in `cluf_options` and `.clufrc`.  We cover those now.  See
+**Reference** for all available options.
+
+### Environment variables
+Let's suppose execution of your target script requires certain environment
+variables to be set.  If you run `cluf` in *direct mode*, there's nothing to
+think about -- your script will execute in an environment inhereted from the
+one you are in.  
+
+For example, if you did:
+```bash
+MYENV=1 cluf my_script.py
+```
+The value of `MYENV` would be seen by your script.
+
+However, if you run `cluf` in dispatch mode, then the job scripts will not
+be run in a different environment.  Use the `env` option to specify any 
+environment variables that should be set when running the subjobs.  `env` should
+be a dictionary within `cluf_options` or `.clufrc` that has variable names
+as keys and values as, well, values:
+
+(in `my_script.py`)
+```python
+cluf_options = {
+	...
+	'env': {'MYENV': 1}
+}
+```
+
+(in `~/.clufrc`)
+```json
+{ ... "env": {"MYENV": 1}}
+```
+
+Setting the env option using either method shown will cause the given environment
+variables to be set within each of the subjob scripts.
+
+# Additional statements
+You can also specify any additional statements that you want to appear in your
+job script.  This gives you more flexibility than simply setting environment 
+variables.   You can include statements before the subjob is run using
+ `prepend_statements` or after, using `append_statements`.  The value of 
+the either should be a list of statements, which will be joined with endline
+characters before placing it in the subjob script.  You can also use the 
+options `prepend_script` and `append_script`, passing it a file path, to include
+the contents of full scripts into your subjob scripts.  (while the `prepend_statements` and `append_statements` options are only available using `cluf_options`
+and `.clufrc`, you can specify `prepend_script` and `append_script` on the
+commandline.  Multiple, comma-separated scripts may be given.
+
+
 # Reference
 
-The `cluf` command has lots of options, most of which can be specified in either
-of two places:
+The `cluf` command has lots of options, which can be specified in three
+different places:
 
  1. as command line arguments, or
- 2. within your target module, inside a dictionary called clum_options
+ 2. within your target module, inside a dictionary called clum_options, or
+ 3. in the `~/.clufrc` file, in the form of a JSON object
 
-When an option is set in both places, the command line option overrides.
-Using clum_options helps to document how your script was run, while using the
-command line gives you ad hoc flexibility and fulfills the goal of zero-code 
-multiprocessing / cluster processing.  The key for options set in clum_options
-should be the long name of the corresponding command line option, without the
-leading '--'.  Options that can be specified both on the command line and in the
-target script will be covered first, followed by the options that can only be
-specified in the target module.  All options can be specified in the target
-module except where noted.
+These locations are in decreasing order of precedence, i.e. the command line
+overrides all other options, and the `.clufrc` file doesn't override the others.
 
-### Options that can be specified via command line 
+Options given in the `clum_options` dictionary in the target module or in the
+`.clufrc` JSON object should be identified by the long option name, without
+the leading '--'.
 
+
+### All `cluf` options
+
+<pre>
 usage: cluf [-h] [-j JOBS_DIR] [-t TARGET] [-a ARGS] [-q] [-p PROCESSES]
             [-b BINS] [-n NODES | -i ITERATIONS]
             target_module
@@ -241,174 +328,6 @@ optional arguments:
                         has to be counted before dispatching in order to
                         determine the number of compute nodes needed.
 
-
-
-Thee commands are also outside of the scope of this tool, but are provided here
-as a handy bare minimum to start mucking about with running jobs on a cluster.
-
-## Stdout and stderr
-
-Once your jobs complete, anything that was sent to stdout or stderr
-will be stored in `<script-name>-<job-num>-<num-jobs>.stdout` and
-`<script-name>-<job-num>-<num-jobs>.stderr` in the current directory,
-respectively.
-
-## A few details you should know about ##
-
-To distribute work between nodes, the script hashes the string 
-representation of the first argument in each iteration into one of 
-<num-nodes> bins.  This makes a stable
-but pseudorandom assignment -- stable in the sense that iterations will
-always be grouped onto the same nodes according to their first argument.
-
-To ensure good load balancing, the first argument should be unique accross 
-all iterations.  
-
-If a different argument should be used for balancing (if, say, the 
-second argument is always unique) you can specify that in the script 
-options.
-
-If many iterations have the same first argument, it's not a fatal problem, 
-but they will
-all be sent to the same machine.  It's not a fatal problem, but it might
-imbalance the load.
-
-Second, before hashing, the first argument will have `str()` called on it.
-Anything with a reasonable and unique string representation will work fine.
-The argument values themselves don't need to be hashable because of this.
-It doesn't need to be hashable.  If calling `str()` just yields a memory
-address, then this will probably achieve uniqueness, but you subsequent
-runs over the same arguments wouldn't group work onto machines in the same
-way (which generally isn't a problem and sometimes might be desireable).
-
-
-
-
-`IterableQueue` is a directed queue, which means that it has 
-(arbitrarily many) *producer endpoints* and *consumer endpoints*.  This
-directedness enables `IterableQueue` to know how many producers and 
-consumers are still at work, and this lets it take care of the tracking
-and signalling necessary to tell the difference between being 
-temporarily empty, and being empty with no new work coming.  Because the
-`IterableQueue` knows when no new work is coming, it can be treated like
-an iterable on the consumer end, stopping iteration naturally when all work 
-is complete.
-
-Producers use the queue much like a `multiprocessing.Queue`, but with one
-small variation: when they are done putting work on the queue, they call
-`queue.close()`:
-
-```python
-producer_func(queue):
-	while some_condition:
-		...
-		queue.put(some_work)
-		...
-	queue.close()
-```
-
-The beautiful part is in how consumers use the queue, which is somewhat
-differently than it is with `multiprocessing.Queue`: 
-consumers can simply treat the queue as an iterable:
-
-```python
-consumer_func(queue):
-	for work in queue:
-		do_something_with(work)
-```
-
-Because the `IterableQueue` knows how many producers and consumers are open,
-it knows when no more work will come through the queue, and so it can
-stop iteration transparently.
-
-(Although you can, if you choose, consume the queue "manually" by calling 
-`queue.get()`, with `Queue.Empty` being raised whenever the queue is empty, and `iterable_queue.ConsumerQueueClosedException` being raised when the queue is empty with no more work coming.)
-
-## Use `IterableQueue` ##
-As mentioned, `IterableQueue` is a directed queue, meaning that it has 
-producer and consumer endpoints.  Both wrap the same underlying 
-`multiprocessing.Queue`, and expose *nearly* all of its methods.
-Important exceptions are the `put()` and `get()` methods: you can only
-`put()` onto producer endpoints, and you can only `get()` from consumer 
-endpoints.  This distinction is needed for the management of consumer 
-iteration to work automatically.
-
-To see an example, let's setup a function that will be executed by 
-*producers*, i.e. workers that *put onto* the queue:
-
-```python
-from random import random
-from time import sleep
-
-def producer_func(queue, producer_id):
-	for i in range(10):
-		sleep(random() / 100.0)
-		queue.put(producer_id)
-	queue.close()
-```
-
-Notice how the producer calls `queue.close()` when it's done putting
-stuff onto the queue.
-
-Now let's setup a consumer function:
-```python
-def consumer_func(queue, consumer_id):
-	for item in queue:
-		sleep(random() / 100.0)
-		print 'consumer %d saw item %d' % (consumer_id, item)
-```
-
-Notice again how the consumer treats the queue as an iterable&mdash;there 
-is no need to worry about detecting a termination condition.
-
-Now, let's get some processes started.  First, we'll need an `IterableQueue`
-Instance:
-
-```python
-from iterable_queue import IterableQueue
-iq = IterableQueue
-```
-
-Now, we just start an arbitrary number of producer and consumer 
-processes.  We give *producer endpoints* to the producers, which we get
-by calling `IterableQueue.get_producer()`, and we give *consumer endpoints*
-to consumers by calling `IterableQueue.get_consumer()`:
-
-```python
-from multiprocessing import Process
-
-# Start a bunch of producers:
-for producer_id in range(17):
-	
-	# Give each producer a "producer-queue"
-	queue = iq.get_producer()
-	Process(target=producer_func, args=(queue, producer_id)).start()
-
-# Start a bunch of consumers
-for consumer_id in range(13):
-
-	# Give each consumer a "consumer-queue"
-	queue = iq.get_consumer()
-	Process(target=consumer_func, args=(queue, consumer_id)).start()
-```
-
-Finally&mdash;and this is important&mdash;once we've finished making 
-producer and consumer endpoints, we close the `IterableQueue`:  
-
-```python
-iq.close()
-```
-
-This let's the `IterableQueue` know that no new producers will be coming 
-onto the scene and adding more work.
-
-And we're done.  Notice the pleasant lack of signalling and keeping track 
-of process completion, and notice the lack of `try ... except Empty` 
-blocks: you just iterate through the queue, and when its done its done.
-
-You can try the above example by running [`example.py`](https://github.com/enewe101/iterable_queue/blob/master/iterable_queue/example.py).
-
-
-
+</pre>
 
 
