@@ -260,8 +260,8 @@ MYENV=1 cluf my_script.py
 ```
 The value of `MYENV` would be seen by your script.
 
-However, if you run `cluf` in dispatch mode, then the job scripts will not
-be run in a different environment.  Use the `env` option to specify any 
+However, if you run `cluf` in dispatch mode, then the job scripts will
+run in a different environment.  Use the `env` option to specify any 
 environment variables that should be set when running the subjobs.  `env` should
 be a dictionary within `cluf_options` or `.clufrc` that has variable names
 as keys and values as, well, values:
@@ -280,8 +280,16 @@ cluf_options = {
 }
 ```
 
-Setting the env option using either method shown will cause the given environment
-variables to be set within each of the subjob scripts.
+If provided on the commandline, the contents of `env` will be pasted as-is
+in front of the line that runs the subjob within the subjob script.  In other
+words, this:
+```bash
+cluf my_script.py --nodes=4 --env='MYENV=foo OTHER_ENV=bar'
+```
+will result in this line within your subjob scripts
+```bash
+MYENV=foo OTHER_ENV=BAR cluf my_script [...options]
+```
 
 ### PBS options
 (This option cannot be set on the command line.)
