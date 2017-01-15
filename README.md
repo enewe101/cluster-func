@@ -251,7 +251,7 @@ See **Reference** for all available options.
 convenient.)
 Let's suppose execution of your target script requires certain environment
 variables to be set.  If you run `cluf` in *direct mode*, there's nothing to
-think about&emdash;your script will inheret the current environment.
+think about—your script will inheret the current environment.
 
 For example, if you did:
 ```bash
