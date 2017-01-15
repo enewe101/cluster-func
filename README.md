@@ -251,8 +251,7 @@ See **Reference** for all available options.
 convenient.)
 Let's suppose execution of your target script requires certain environment
 variables to be set.  If you run `cluf` in *direct mode*, there's nothing to
-think about -- your script will execute in an environment inhereted from the
-one you are in.  
+think about&emdash;your script will inheret the current environment.
 
 For example, if you did:
 ```bash
@@ -288,7 +287,7 @@ cluf my_script.py --nodes=4 --env='MYENV=foo OTHER_ENV=bar'
 ```
 will result in this line within your subjob scripts
 ```bash
-MYENV=foo OTHER_ENV=BAR cluf my_script [...options]
+MYENV=foo OTHER_ENV=bar cluf my_script [...options]
 ```
 
 ### PBS options
