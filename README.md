@@ -256,12 +256,13 @@ variables to be set within each of the subjob scripts.
 ### PBS options
 Portable Batch System options control how the cluster scheduler schedules your
 job, and allows you to request specific compute resources and specify the
-amount of time that your job should run.  For example, to request that your
+amount of time that your job should run.
+In general pbs options should be set using a dictionary of key-value pairs
+using the option name as the key:
+  For example, to request that your
 jobs run on compute nodes with at least 4 cpu cores and 2 gpus, you can do
 something like this:
 
-In general pbs options should be set using a dictionary of key-value pairs
-using the option name as the key:
 
 (in `my_script.py`)
 ```python
