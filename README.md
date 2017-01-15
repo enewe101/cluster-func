@@ -268,24 +268,32 @@ as keys and values as, well, values:
 (in `my_script.py`)
 ```python
 cluf_options = {
-	'env': {'MYENV': 1}
+	'env': {
+		'MYENV': 'foo',
+		'OTHER_ENV': 'bar',
+	}
 }
 ```
 
 (in `~/.clufrc`)
 ```json
 {
-	"env": {"MYENV": 1}
+	"env": {
+		"MYENV": "foo",
+		"OTHER_ENV": "bar"
+	}
 }
 ```
 
 If provided on the commandline, the contents of `env` will be pasted as-is
-in front of the line that runs the subjob within the subjob script.  In other
-words, this:
+in front of the line that runs the subjob within the subjob script.  So the
+equivalent `env` specification would be:
 ```bash
 cluf my_script.py --nodes=4 --env='MYENV=foo OTHER_ENV=bar'
 ```
-will result in this line within your subjob scripts
+
+Each of these methods will cause the invocation of subjobs within subjob
+scripts to look like this:
 ```bash
 MYENV=foo OTHER_ENV=bar cluf my_script [...options]
 ```
