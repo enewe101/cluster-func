@@ -257,44 +257,43 @@ variables to be set within each of the subjob scripts.
 Portable Batch System options control how the cluster scheduler schedules your
 job, and allows you to request specific compute resources and specify the
 amount of time that your job should run.
-In general pbs options should be set using a dictionary of key-value pairs
-using the option name as the key:
-  For example, to request that your
-jobs run on compute nodes with at least 4 cpu cores and 2 gpus, you can do
+In general PBS options should be set using a dictionary of key-value pairs
+using the option name as the key.  For example, to request that your
+subjobs run on compute nodes with at least 4 cpu cores and 2 gpus, you can do
 something like this:
 
 
 (in `my_script.py`)
 ```python
 cluf_options = {
-	'pbs_options': {'cpus': 4, 'gpus': 2}
+	'pbs_options': {'ppn': 4, 'gpus': 2}
 }
 ```
 
 (in `~/.clufrc`)
 ```json
 {
-	"pbs_options": {"cpus": 4, "gpus": 2}
+	"pbs_options": {"ppn": 4, "gpus": 2}
 }
 ```
 
 However there are three special option whose names differ from the 
 PBS option names slightly.  These options are also set by default.
 
-	- `'name'`: the name of your subjobs as they appear in the job scheduler.
-		this is also used to name your subjob scripts.  The default is the 
-		format string `'{target_module}-{node_num}-{nodes}'`.  If you override
-		this you can also use those format fields, and you must at least use
-		the `{node_num}` field to ensure that each of your subjobs gets a 
-		unique name (otherwise the subjob scripts will overwrite one another.
-	- `'stdout'`: the path at which to place stdout captured from your subjobs,
-		relative to the `jobs_dir` if set (if not set it defaults to the current
-		working directory).
-		The default is `'{target_module}-{node_num}-{nodes}.stdout'`
-		As for name, if you override this, make sure that the paths for subjobs
-		are unique by using the `{node_num}` field somewhere.
-	- `'stderr'`: similar to stdout.  Defaults to 
-		`'{target_module}-{node_num}-{nodes}.stderr'`
+- `'name'`: the name of your subjobs as they appear in the job scheduler.
+	this is also used to name your subjob scripts.  The default is the 
+	format string `'{target_module}-{node_num}-{nodes}'`.  If you override
+	this you can also use those format fields, and you must at least use
+	the `{node_num}` field to ensure that each of your subjobs gets a 
+	unique name (otherwise the subjob scripts will overwrite one another.
+- `'stdout'`: the path at which to place stdout captured from your subjobs,
+	relative to the `jobs_dir` if set (if not set it defaults to the current
+	working directory).
+	The default is `'{target_module}-{node_num}-{nodes}.stdout'`
+	As for name, if you override this, make sure that the paths for subjobs
+	are unique by using the `{node_num}` field somewhere.
+- `'stderr'`: similar to stdout.  Defaults to 
+	`'{target_module}-{node_num}-{nodes}.stderr'`
 
 The combinations of PBS options that are available and/or required depends on 
 the setup of your cluster.
