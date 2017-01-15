@@ -119,19 +119,21 @@ class ClufArgParser(object):
 			'-o', '--pbs-options', help=(
 				'Set the PBS options.'
 			)
+		)
 
-		# Only one of the the optional arguments that determine the argument(s) on 
-		# which to base binning cannot both be set.
+		# Only one of the the optional arguments that determine the argument(s)
+		# on which to base binning cannot both be set.
 		group = parser.add_mutually_exclusive_group()
 		group.add_argument(
 			'-x', '--hash',
 			help=(
-				'Specify an argument or set of arguments to be used to determine '
-				'which bin an iteration belons in.  These arguments should have '
-				'a stable string representation (i.e. no unordered containers or '
-				'memory addresses) and should be unique over the argumetns '
-				"iterable.  This should only be set if automatic binning won't "
-				'work, i.e. if your argument iterable is not stable.'
+				'Specify an argument or set of arguments to be used to '
+				'determine which bin an iteration belons in.  These arguments '
+				'should have a stable string representation (i.e. no '
+				'unordered containers or memory addresses) and should be '
+				'unique over the iterable.  This should only be set '
+				"if automatic binning won't work, i.e. if your argument "
+				'iterable is not stable.'
 			)
 		)
 		group.add_argument(

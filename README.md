@@ -55,10 +55,10 @@ or to use a different number of worker processes, do this:
 $ cluf my_script.py --target=my_func --args=my_iterable --processes=12	# short options -t, -a, -p
 ```
 
-If `args` yields a tuple, its contents will be unpacked and used as positional
-arguments.  Single-argument invocations need not be packed into a 1-tuple 
-(unless that argument is itself a tuple).  Separate invocations can use different
-numbers of arguments.
+If `args` yields a tuple, its contents will be unpacked and interpreted as the
+positional arguments for one invocation of the target function.  If you need
+greater control, for example, to provide keyword arguments, see 
+"Arguments iterable"
 
 `args` can also be a callable that *returns* an iterable (including a generator),
 which is often more convenient.
@@ -97,6 +97,27 @@ before submitting it.
 To divide the work properly, it's important that your argument iterable yields
 the same arguments in the same order on each machine.  If you can't or don't
 want write your iterable that way, see **How work is divided** for other options.
+
+## Arguments iterable
+The main usecase imagined is one where the arguments iterable yields either
+single bare arguments, or lists of positional arguments that should be used to 
+invoke the target function.  Of course, the python language provides a very
+flexible way of calling functions, allowing you to mix positional arguments
+and keyword arguments.  If you need that flexibility, then set up your iterator
+to yield `cluster_func.Arguments` objects.  This class acts as a proxy, so that
+when you can call it in exactly the way that you would like to call your
+target function.
+
+Here is the `Arguments` class in action:
+```python
+>>> from cluster_func import Arguments
+>>> my_args = Arguments(1, *[3,4,5], six=6, **{'seven':7, 'eight':8})
+>>> my_args
+Arguments(1, 3, 4, 5, seven=7, six=6, eight=8)
+>>>
+>>> # Your target function will be called like this
+>>> my_target(*my_args.args, **my_args.kwargs)
+```
 
 ## How work is divided 
 By default, work is divided by assuming that the arguments iterator will yield
@@ -151,20 +172,23 @@ doesn't reflect their value, and because their memory address appears within
 it, which will be different in each subjob.  However, for this purpose, a list
 would be considered "hashable" (provided it's individual elements are).  On the
 other hand, dict's and sets are not suitable, because they are unordered, so
-their string representation is not stable.  One approach is to simply provide
-one argument that is a unique ID, and select it for hashing.
+their string representation is not stable.  One safe approach is to simply 
+provide one argument that is a unique ID, and select it for hashing.
 
 Ideally the argument selected for hashing should be unique throughout
 iteration, since repeated values would be assigned to the same subjob, but
 occaisional repetitions won't imbalance load much.  To help achieve uniqueness
-you can provide combinations of arguments to be hashed.
+you can provide combinations of arguments to be hashed.  If you provided 
+arguments as keyword arguments (using an Arguments object) select them too.
 
 For example, this:
 ```bash
-$ cluf example --nodes=12 --hash=0-2,5		# short options: -n and -x
+$ cluf example --nodes=12 --hash=0-2,5,my_kwarg	# short options: -n and -x
 ```
-will hash arguents 0,1,2, and 5.  If any hashed arguments are missing in an 
-iteration, they are considered equal to `None`.
+will hash arguents in positions 0,1,2,5 along with the keyword argument 
+`my_kwarg`.  If any hashed arguments are missing in an 
+iteration (becase, recall, invocations may use different numbers of arguments), 
+they simply ommitted.
 
 ### Direct assignment
 A final method is to include an argument that explicitly specifies the
@@ -175,7 +199,7 @@ argument should be interpreted as the bin, use `--key` option:
 $ cluf example --nodes=12 --key=2 		# short options: -n and -k
 ```
 In the command above, argument 2 (the third argument) will be interpreted as
-the bin for each iteration.
+the bin for each iteration.  You can also specify a keyword argument by name.
 
 You should only use direct assignment if you really have to, because it's more
 error prone, and it makes it more difficult to change the number bins.  It also
@@ -197,9 +221,9 @@ same key-value format.  See the following examples:
 (in `my_script.py`)
 ```python
 cluf_options = {
-	'hash': (0,1,2,5),	# Collection options set using iterable
+	'hash': (0,1,2,5),	# Or use '0-2,5'.  Applies to .clufrc as well
 	'nodes': 12,
-	'queue': True		# Flag options set using using boolean
+	'queue': True		# Flag options based on truthiness of value
 }
 ```
 

@@ -170,7 +170,13 @@ def unfurl(string_representation):
 	for span in spans:
 
 		# Split up the start, stop, and incrment values in the expression
-		span = [int(s) for s in UNFURL_SPLITTER_2.split(span)]
+		try:
+			span = [int(s) for s in UNFURL_SPLITTER_2.split(span)]
+
+		# If this span isn't an integer range expression, its a keyword argument
+		except ValueError:
+			unfurled.append(span)
+			continue
 
 		# Handle the case where the span is an individual value.
 		if len(span) == 1:
@@ -188,7 +194,6 @@ def unfurl(string_representation):
 def ensure_exists(path):
 	if not os.path.exists(path):
 		os.makedirs(path)
-
 
 
 def normalize_options(options):
@@ -227,6 +232,15 @@ def normalize_options(options):
 	# Convert hash option into a list
 	if 'hash' in options and isinstance(options['hash'], basestring):
 		options['hash'] = unfurl(options['hash'])
+
+	# Parse the key option.  Try to interpret it as an integer specifying the
+	# position of the key argument, otherwise leave it as a string, to be 
+	# interpreted as the name of a keyword argument
+	if 'key' in options and isinstance(options['hash'], basestring):
+		try:
+			options['key'] = int(options['key'])
+		except ValueError:
+			pass
 
 	# Convert env dictionary into a string
 	if 'env' in options and not isinstance(options['env'], basestring):

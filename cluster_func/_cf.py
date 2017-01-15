@@ -53,8 +53,9 @@ from iterable_queue import IterableQueue
 
 # From this package
 import utils
-from exceptions import OptionError, RCFormatError
+from arguments import Arguments
 from arg_parser import ClufArgParser
+from exceptions import OptionError, RCFormatError
 
 # Constants
 DEFAULT_PBS_OPTIONS = {
@@ -103,7 +104,6 @@ except OptionError as e:
 	sys.exit(1)
 
 
-
 # Entry points for handling the `cluf` command.
 def main():
 	'''
@@ -132,9 +132,11 @@ def main():
 
 		# Run the function with the arguments
 		if mode == 'dispatch':
+			print 'dispatching'
 			dispatch(target_module_path, args)
 		elif mode == 'direct':
-			run(target_module_path, args)
+			print 'direct'
+			run_direct(target_module_path, args)
 		else:
 			raise OptionError('Unexpected mode: %s' % mode)
 
@@ -525,7 +527,7 @@ def format_pbs_statements(target_module_name, node_num, options):
 	return '\n'.join(pbs_option_statements)
 
 
-def run( target_module_path, options
+def run_direct( target_module_path, options
 ):
 	'''
 	This function performs a portion of an embarassingly parallel problem that
@@ -661,11 +663,11 @@ def pass_through_args(target_module_path, args):
 def worker(target_func, args_consumer):
 	'''
 	Runs the callable `target_func` repeatedly inside a single process.  
-	Consumes sets of arguments from the IterbleQueue.ConsumerQueue 
+	Consumes sets of arguments from the IterableQueue.ConsumerQueue 
 	`args_consumer`, unpacks them, and executes target_func with them.
 	'''
 	for args in args_consumer:
-		target_func(*args)
+		target_func(*args.args, **args.kwargs)
 
 
 def generate_args_subset(iterable, options):
@@ -715,10 +717,10 @@ def generate_args_subset(iterable, options):
 	# of each argument indexed in hash (which is a list of ints), and
 	# hash it to determine the bin.
 	if 'hash' in options:
-		for args in as_tuples(iterable):
+		for args in as_arguments(iterable):
 			hashable = ''.join([
-				str(args[i] if len(args) > i else None) 
-				for i in options['hash']
+				str(args[i])
+				for i in options['hash'] if i < len(args)
 			])
 			this_bin = utils.binify(hashable, options['num_bins'])
 			if this_bin in options['these_bins']:
@@ -727,25 +729,27 @@ def generate_args_subset(iterable, options):
 	# However, if "key" is specified, then the key'th argument designates
 	# the bin
 	elif 'key' in options:
-		for args in as_tuples(iterable):
+		for args in as_arguments(iterable):
 			if args[options['key']] in options['these_bins']:
 				yield args
 
 	# By default, work is dealt around to each bin in the order that it is
 	# yielded
 	else:
-		for i, args in enumerate(as_tuples(iterable)):
+		for i, args in enumerate(as_arguments(iterable)):
 			if i % options['num_bins'] in options['these_bins']:
 				yield args
 
 
-def as_tuples(iterable):
-	"""Ensure elements emerge wrapped in tuples."""
+def as_arguments(iterable):
+	"""Ensure elements emerge wrapped Arguments objects."""
 	for item in iterable:
-		if isinstance(item, tuple):
+		if isinstance(item, Arguments):
 			yield item
+		elif isinstance(item, tuple):
+			yield Arguments(*item)
 		else:
-			yield (item,)
+			yield Arguments(item)
 
 
 
