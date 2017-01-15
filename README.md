@@ -207,12 +207,11 @@ cluf_options = {
 (in `~/.clufrc`)
 ```json
 {
-	"hash": [0,1,2,5], 	# Collection options set using Array
+	"hash": [0,1,2,5],
 	"nodes": 12,
-	"queue": True		# Flag options set using boolean
+	"queue": true
 }
 ```
-*Don't forget that JSON requires double quotes around strings.* 
 
 For the most part, any option that can be set on the command line can be set in
 `cluf_options` and `.clufrc`, and vice versa, but there are a few options that
