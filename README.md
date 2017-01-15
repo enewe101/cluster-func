@@ -164,8 +164,8 @@ $ cluf example --nodes=12 --hash=0		# short options: -n and -x
 will instruct `cluf` to hash the first argument of each iteration to decide
 which bin the iteration belongs to.  
 
-Before hashing, `cluf` calls `str` on the argument (so for this purpose, lists
-are hashable).  It's important that the argument selected for hashing has a
+Before hashing, `cluf` calls `str` on the argument.  
+It's important that the argument selected for hashing has a
 stable string representation that reflects its value. Using objects that don't
 implement `__str__` won't work, both because their string representation
 doesn't reflect their value, and because their memory address appears within
@@ -179,13 +179,14 @@ Ideally the argument selected for hashing should be unique throughout
 iteration, since repeated values would be assigned to the same subjob, but
 occaisional repetitions won't imbalance load much.  To help achieve uniqueness
 you can provide combinations of arguments to be hashed.  If you provided 
-arguments as keyword arguments (using an Arguments object) select them too.
+arguments as keyword arguments (using an Arguments object) you can select them 
+too.
 
 For example, this:
 ```bash
 $ cluf example --nodes=12 --hash=0-2,5,my_kwarg	# short options: -n and -x
 ```
-will hash arguents in positions 0,1,2,5 along with the keyword argument 
+will hash arguents in positions 0,1,2, and 5, along with the keyword argument 
 `my_kwarg`.  If any hashed arguments are missing in an 
 iteration (becase, recall, invocations may use different numbers of arguments), 
 they simply ommitted.
@@ -198,7 +199,8 @@ argument should be interpreted as the bin, use `--key` option:
 ```bash
 $ cluf example --nodes=12 --key=2 		# short options: -n and -k
 ```
-In the command above, argument 2 (the third argument) will be interpreted as
+In the command above, the argument in position 2 (the third argument)
+ will be interpreted as
 the bin for each iteration.  You can also specify a keyword argument by name.
 
 You should only use direct assignment if you really have to, because it's more
@@ -207,7 +209,8 @@ introduces job division logic into your script which `cluf` was designed to
 prevent.
 
 ## `cluf_options` and `.clufrc`
-You can include a dictionary named `cluf_options` in your target script to
+For more extensive configuration, you can include a dictionary named 
+`cluf_options` in your target script to
 control the behavior of `cluf`.  This can be more convenient than the command
 line if you have to set a lot of options, and helps to document the options
 you used.  You can also set options globally in a file at `~/.clufrc`. 
@@ -239,10 +242,13 @@ cluf_options = {
 
 For the most part, any option that can be set on the command line can be set in
 `cluf_options` and `.clufrc`, and vice versa, but there are a few options that
-can *only* be set in `cluf_options` and `.clufrc`.  We cover those now.  See
-**Reference** for all available options.
+can *only* be set in `cluf_options` and `.clufrc`.  We cover those now along
+with some options that are just less convenient to set on the command line.  
+See **Reference** for all available options.
 
 ### Environment variables
+(Note: This option can be set on the command line but is somewhat less 
+convenient.)
 Let's suppose execution of your target script requires certain environment
 variables to be set.  If you run `cluf` in *direct mode*, there's nothing to
 think about -- your script will execute in an environment inhereted from the
@@ -278,6 +284,7 @@ Setting the env option using either method shown will cause the given environmen
 variables to be set within each of the subjob scripts.
 
 ### PBS options
+(This option cannot be set on the command line.)
 Portable Batch System options control how the cluster scheduler schedules your
 job, and allows you to request specific compute resources and specify the
 amount of time that your job should run.
@@ -326,17 +333,22 @@ so that you can queue simple jobs without setting any PBS options.
 
 
 ### Additional statements
+(This option can be set on the command line but may be more convenient to set
+within your target script.)
 You can also specify any additional statements that you want to appear in your
-job script.  This gives you more flexibility than simply setting environment 
-variables.   You can include statements before the subjob is run using
- `prepend_statements` or after, using `append_statements`.  The value of 
-the either should be a list of statements, which will be joined with endline
-characters before placing it in the subjob script.  You can also use the 
-options `prepend_script` and `append_script`, passing it a file path, to include
-the contents of full scripts into your subjob scripts.  (while the `prepend_statements` and `append_statements` options are only available using `cluf_options`
-and `.clufrc`, you can specify `prepend_script` and `append_script` on the
-commandline.  Multiple, comma-separated scripts may be given.
+subjob scripts.  This gives you more flexibility than simply setting environment 
+variables.   You can include an external script, whose statements get merged
+into the job script before the line that runs subjob using
+ `prepend_script`.  Include an external script *after* the line that runs
+the subjob using the `append_script` option.  
 
+If you just want to add a statement or two, it maybe more convenient to 
+put them in your target script (or `.clufrc`).
+The options `prepend_statements` and `append_statements` can be used provide a 
+list of shell statements that get inserted right before or after the line
+that actually runs the subjob within subjob scripts.  Each element of the list
+should be a valid shell statement which will appear on its own line when merged
+into the jobscripts.  The options aren't available on the command line.
 
 # Reference
 
