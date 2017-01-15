@@ -49,6 +49,12 @@ will look in `my_script.py` for a function called `target` and an iterable calle
 spawning as many workers as there are cpu cores available to your user on the
 machine.  
 
+To use other names for you target function or arguments iterable,
+or to use a different number of worker processes, do this:
+```bash
+$ cluf my_script.py --target=my_func --args=my_iterable --processes=12	# short options -t, -a, -p
+```
+
 If `args` yields a tuple, its contents will be unpacked and used as positional
 arguments.  Single-argument invocations need not be packed into a 1-tuple 
 (unless that argument is itself a tuple).  Separate invocations can use different
@@ -56,12 +62,6 @@ numbers of arguments.
 
 `args` can also be a callable that *returns* an iterable (including a generator),
 which is often more convenient.
-
-To use other names for you target function or arguments iterable,
-or to use a different number of worker processes, do this:
-```bash
-$ cluf my_script.py --target=my_func --args=my_iterable --processes=12	# short options -t, -a, -p
-```
 
 So, using `cluf` in direct mode lets you multiprocess any script without pools
 or queues or even importing multiprocessing.  But, if you really need to scale
