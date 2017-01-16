@@ -100,8 +100,8 @@ want write your iterable that way, see **How work is divided** for other options
 
 ## Arguments iterable
 The main usecase imagined is one where the arguments iterable yields either
-single bare arguments, or tuples of positional arguments.  Of course, the Python 
-language provides a very
+single, bare arguments, or tuples of positional arguments.  Of course, the 
+Python language provides a very
 flexible way of calling functions, allowing you to mix positional arguments
 and keyword arguments.  If you need that flexibility, then set up your iterator
 to yield `cluster_func.Arguments` objects.  This class acts as a proxy, and 
@@ -115,8 +115,8 @@ Here is the `Arguments` class in action:
 >>> my_args
 Arguments(0, 1, 2, 3, four=4, five=5, six=6)
 >>>
->>> # Your target function will be called like this
->>> my_target(*my_args.args, **my_args.kwargs)
+>>> # Your target function would be called the same way you called Arguments, e.g.:
+>>> my_target(0, *[1,2,3], four=4, **{'five':5, 'six':6})
 ```
 
 ## How work is divided 
