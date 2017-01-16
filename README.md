@@ -81,12 +81,7 @@ will break the work into 10 subjobs, and submit them using qsub.  It does
 this by writing small shell scripts, each of which is responsible for calling 
 the target function on a subset of the arguments yielded by the iterable.
 
-(Each shell script has Portable Batch System (PBS) directives that cause the
-stdout and stdin to be captured into files by the same name (but with
-extentions .stdout and .stdin) in the current working directory.  PBS
-directives appear as comments, so the scripts are perfectly valid shell scripts
-that can be executed normally.  You can set any PBS directives you want, see
-**Cluf options**, and **Reference** for details.)
+(To learn about setting PBS directives for your subjob scripts, see **PBS directives**)
 
 Because each subjob script is a valid shell script, you can manually run them
 on separate machines in case they aren't part of a cluster that uses `qsub`.
@@ -97,6 +92,9 @@ before submitting it.
 To divide the work properly, it's important that your argument iterable yields
 the same arguments in the same order on each machine.  If you can't or don't
 want write your iterable that way, see **How work is divided** for other options.
+
+And that's the end of the basic usage guide.  This will cover you for the most 
+basic usecases.  To learn about more cool features, read on!
 
 ## Arguments iterable
 The main usecase imagined is one where the arguments iterable yields either
