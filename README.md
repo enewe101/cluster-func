@@ -73,8 +73,8 @@ $ cluf my_script.py --target=my_func --args=my_iterable --processes=12	# short o
 
 If `args` yields a tuple, its contents will be unpacked and interpreted as the
 positional arguments for one invocation of the target function.  If you need
-greater control, for example, to provide keyword arguments, see 
-"Arguments iterable"
+greater control, for example, to provide keyword arguments, then see 
+**Arguments iterable**
 
 `args` can also be a callable that *returns* an iterable (including a generator),
 which is often more convenient.
