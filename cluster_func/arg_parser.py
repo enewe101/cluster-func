@@ -188,10 +188,6 @@ class ClufArgParser(object):
 		# token.
 		parsed_args, target_cli = self.parser.parse_known_args(args)
 
-		# Let the user see how the arguments were interpreted.
-		for k,v in vars(parsed_args).items():
-			print '%s = %s' % (k, v)
-
 		# Pack all the arguments into a dictionary, exclude args that are None
 		parsed_args = {
 			k: v
