@@ -66,9 +66,13 @@ DEFAULT_CLUF_OPTIONS = {
 	'num_bins': 1,
 	'queue': False, 
 	'target_cli': [],
-	'env': {},
-	'processes': utils.cpus(),
-	'pbs_options': {}
+	'env': '',
+	'pbs_options': {},
+	'jobs_dir': '.',
+	'prepend_script': [],
+	'append_script': [],
+	'prepend_statements': [],
+	'append_statements': [],
 }
  
 DEFAULT_GUILLIMIN_MODULES	= ['Python/2.7.10']
@@ -138,13 +142,28 @@ def main():
 		parser.print_usage()
 
 
+def load_source(target_module_path):
+	'''
+	Import the module located at `target_module_path`.  The target module's name
+	and a reference to the target module are returned (in that order).
+	'''
+	target_module_fname = os.path.basename(target_module_path)
+	target_module_name, ext = os.path.splitext(target_module_fname)
+	module = imp.load_source(target_module_name, target_module_path)
+	return target_module_name, module
 
 
+# TODO: There must be another way to dynamically load modules that have 
+# 	relative path
+# 	imports without having to put their directory on path...
 def load_module(target_module_path):
 	'''
 	Import the module located at `target_module_path`.  The target module's name
 	and a reference to the target module are returned (in that order).
 	'''
+	directory = os.path.dirname(target_module_path)
+	#print 'directory', directory
+	sys.path.append(directory)
 	full_path, target_module_name, found_module = find_module(
 		target_module_path)
 	target_module = imp.load_module(target_module_name, *found_module)
@@ -271,6 +290,7 @@ def dispatch(target_module_path, options):
 
 	# Import the target module, get needed members.
 	target_module_name, module = load_module(target_module_path)
+	#target_module_name, module = load_source(target_module_path)
 
 	# Resolve the options.  In `merge_dicts`, the left-more takes precedence.
 	options = get_options(options, module)
@@ -395,7 +415,7 @@ def format_command_statement(target_module_name, node_num, options):
 	command_tokens = []
 
 	# Add environment variables if any
-	if 'env' in options:
+	if 'env' in options and options['env']:
 		command_tokens.append(options['env'])
 
 	# Add the main part of the command
@@ -547,8 +567,7 @@ def format_pbs_statements(target_module_name, node_num, options):
 	return '\n'.join(pbs_option_statements)
 
 
-def run_direct( target_module_path, options
-):
+def run_direct(target_module_path, options):
 	'''
 	This function performs a portion of an embarassingly parallel problem that
 	is defined in the python module located at `target_module_path`.
