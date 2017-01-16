@@ -21,18 +21,34 @@ python setup.py develop
 
 Too often I find myself writing multiprocessing and job-division / scheduling
 boilerplate code, which, despite being conceptually straightforward, is tedious
-and error-prone.  Let's never do it again.
+and error-prone.
+
+Sure, `xargs` is nice, assuming that you can conveniently get the shell to
+spit out your argument values.  But that's often not the case, and 
+you may want your arguments to be arbitrary python types instead of strings.
+
+And, sure, Hadoop is nice too, assuming you've got a lot of time to burn
+configuring it, and that your mappers and reducers don't use too much 
+memory, and that you've loaded all your data in the hdfs, 
+and that the results from your maps don't 
+yield too much data and overwhelm the network.  Oh, and assuming
+you enjoy writing boilerplate mapper and reducer code... wait, maybe hadoop
+isn't so nice... (OK, OK, it does have its place!)
 
 ## Basic usage
 Cluster-func is designed for situations where you need to run a single function
 on many different arguments.  This kind embarassingly parallelizable problem
 comes up pretty often.  At it's minimum, a solution involves defining
-A) the function to be repeatedly called, and B) all of the different arguments
-on which it should be called.  
+**A)** the function to be repeatedly called, and **B)** all of the different 
+arguments on which it should be called.  
 
 Cluster-func assumes that you have defined
 these in the form of a *callable* and an *iterable* within a python script, and
 then it handles the business of spreading the work across cores and machines.
+
+The nice thing about this approach is that you unavoidably define these two
+things when you write your code for a single process anyway.  So you'll get
+multiprocessing and cluster processing basically for free!
 
 The tool has two modes.  In **direct mode**, it runs your function on the cpus of
 a single machine.  In **dispatch mode**, it breaks the work into subjobs that can
@@ -57,8 +73,8 @@ $ cluf my_script.py --target=my_func --args=my_iterable --processes=12	# short o
 
 If `args` yields a tuple, its contents will be unpacked and interpreted as the
 positional arguments for one invocation of the target function.  If you need
-greater control, for example, to provide keyword arguments, see 
-"Arguments iterable"
+greater control, for example, to provide keyword arguments, then see 
+**Arguments iterable**
 
 `args` can also be a callable that *returns* an iterable (including a generator),
 which is often more convenient.
@@ -73,7 +89,8 @@ uses the `qsub` command for job submission.  But you can still use `cluf` to
 spread work between machines don't use `qsub`.
 
 Dispatch mode is implicitly invoked when you specify a number of compute nodes
-to use.  This command:
+to use (you can force the running mode using `--mode`, see **Reference**).
+For example, this command:
 ```bash
 $ cluf my_script.py --nodes=10 --queue	# short options -n, -q
 ```
@@ -162,7 +179,7 @@ $ cluf example --nodes=12 --hash=0		# short options: -n and -x
 will instruct `cluf` to hash the first argument of each iteration to decide
 which bin the iteration belongs to.  
 
-Before hashing, `cluf` calls `str` on the argument.  
+Before hashing, `cluf` calls `str` on the argument.
 It's important that the argument selected for hashing has a
 stable string representation that reflects its value. Using objects that don't
 implement `__str__` won't work, both because their string representation
@@ -174,7 +191,7 @@ their string representation is not stable.  One safe approach is to simply
 provide one argument that is a unique ID, and select it for hashing.
 
 Ideally the argument selected for hashing should be unique throughout
-iteration, since repeated values would be assigned to the same subjob, but
+iteration, since repeated values would be assigned to the same subjob.  But
 occaisional repetitions won't imbalance load much.  To help achieve uniqueness
 you can provide combinations of arguments to be hashed.  If you provided 
 arguments as keyword arguments (using an Arguments object) you can select them 
@@ -187,10 +204,11 @@ $ cluf example --nodes=12 --hash=0-2,5,my_kwarg	# short options: -n and -x
 will hash arguents in positions 0,1,2, and 5, along with the keyword argument 
 `my_kwarg`.  If any hashed arguments are missing in an 
 iteration (becase, recall, invocations may use different numbers of arguments), 
-they simply ommitted.
+they are simply ommitted when calculating the hash.
 
 ### Direct assignment
-A final method is to include an argument that explicitly specifies the
+The final method for dividing work is to include an argument that explicitly 
+specifies the
 bin for each iteration.  To activate direct assignment, and to specify which
 argument should be interpreted as the bin, use `--key` option:
 
@@ -202,7 +220,8 @@ In the command above, the argument in position 2 (the third argument)
 the bin for each iteration.  You can also specify a keyword argument by name.
 
 You should only use direct assignment if you really have to, because it's more
-error prone, and it makes it more difficult to change the number bins.  It also
+error prone, and it makes it more difficult to change the number of bins.  
+It also
 introduces job division logic into your script which `cluf` was designed to
 prevent.
 
@@ -215,7 +234,7 @@ you used.  You can also set options globally in a file at `~/.clufrc`.
 
 All options that can be set on the command line can be set within `cluf_options`
 or `.clufrc`, plus a few extras.  There is one exception, however, which is
-the option to force direct / inderect running mode, which can only be set on
+the option to force direct / dispatch mode, which can only be set on
 the command line.
 
 `cluf_options` should be a dictionary whose keys are the long option names,
