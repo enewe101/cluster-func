@@ -21,7 +21,20 @@ python setup.py develop
 
 Too often I find myself writing multiprocessing and job-division / scheduling
 boilerplate code, which, despite being conceptually straightforward, is tedious
-and error-prone.  Let's never do it again.
+and error-prone.
+
+Sure, `xargs` is nice, assuming that you can conveniently get the shell to
+spit out your argument values easily.  But that's often not the case, and 
+you may need your arguments to be arbitrary python types, not strings.
+
+And, sure, haddop is nice too, assuming you've got a lot of time to burn
+configuring it, and assuming that your mappers and reducers don't use too much 
+memory, and assuming that you've loaded all your data in the hdfs, 
+and assuming that the results from your maps don't 
+yield too much data and overwhelm the network, and assuming
+you enjoy writing boilerplate mapper and reducer code... wait, maybe hadoop
+isn't so nice... (well, ok, it does have it's place, and for that it's quite
+nice.)
 
 ## Basic usage
 Cluster-func is designed for situations where you need to run a single function
