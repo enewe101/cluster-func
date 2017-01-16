@@ -39,8 +39,8 @@ isn't so nice... (OK, it does has place)
 Cluster-func is designed for situations where you need to run a single function
 on many different arguments.  This kind embarassingly parallelizable problem
 comes up pretty often.  At it's minimum, a solution involves defining
-A) the function to be repeatedly called, and B) all of the different arguments
-on which it should be called.  
+**A)** the function to be repeatedly called, and **B)** all of the different 
+arguments on which it should be called.  
 
 Cluster-func assumes that you have defined
 these in the form of a *callable* and an *iterable* within a python script, and
