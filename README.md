@@ -27,14 +27,13 @@ Sure, `xargs` is nice, assuming that you can conveniently get the shell to
 spit out your argument values easily.  But that's often not the case, and 
 you may need your arguments to be arbitrary python types, not strings.
 
-And, sure, haddop is nice too, assuming you've got a lot of time to burn
+And, sure, Hadoop is nice too, assuming you've got a lot of time to burn
 configuring it, and assuming that your mappers and reducers don't use too much 
-memory, and assuming that you've loaded all your data in the hdfs, 
-and assuming that the results from your maps don't 
-yield too much data and overwhelm the network, and assuming
+memory, and that you've loaded all your data in the hdfs, 
+and that the results from your maps don't 
+yield too much data and overwhelm the network.  Oh, and assuming
 you enjoy writing boilerplate mapper and reducer code... wait, maybe hadoop
-isn't so nice... (well, ok, it does have it's place, and for that it's quite
-nice.)
+isn't so nice... (OK, it does has place)
 
 ## Basic usage
 Cluster-func is designed for situations where you need to run a single function
