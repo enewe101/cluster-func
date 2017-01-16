@@ -215,6 +215,11 @@ control the behavior of `cluf`.  This can be more convenient than the command
 line if you have to set a lot of options, and helps to document the options
 you used.  You can also set options globally in a file at `~/.clufrc`. 
 
+All options that can be set on the command line can be set within `cluf_options`
+or `.clufrc`, plus a few extras.  There is one exception, however, which is
+the option to force direct / inderect running mode, which can only be set on
+the command line.
+
 `cluf_options` should be a dictionary whose keys are the long option names,
 and whose values are strings representing the option values as you would enter
 them on the command line.  `.clufrc` should be a valid JSON object, with the
@@ -298,6 +303,29 @@ scripts to look like this:
 MYENV=foo OTHER_ENV=bar cluf my_script [...options]
 ```
 
+Note that, regardless of where it is specified, if you want to provide a 
+value for an environment variable that contains a space or other character
+needing escaping, keep in mind that a round of interpretation by the 
+command line, Python, or JSON will have occurred (depending on where it was set)
+
+So, e.g., this won't work:
+```bash
+cluf my_script.py --nodes=4 --env='MYENV=foo bar'
+```
+Nor will, this:
+```bash
+cluf my_script.py --nodes=4 --env=MYENV=foo\ bar
+```
+But This will work:
+```bash
+cluf my_script.py --nodes=4 --env='MYENV=foo\ bar'
+```
+And so will this:
+```bash
+cluf my_script.py --nodes=4 --env=MYENV=foo\\\ bar
+```
+will.
+
 ### PBS options
 (This option cannot be set on the command line.)
 Portable Batch System options control how the cluster scheduler schedules your
@@ -307,7 +335,6 @@ In general PBS options should be set using a dictionary of key-value pairs
 using the option name as the key.  For example, to request that your
 subjobs run on compute nodes with at least 4 cpu cores and 2 gpus, you can do
 something like this:
-
 
 (in `my_script.py`)
 ```python
@@ -323,14 +350,21 @@ cluf_options = {
 }
 ```
 
+The `ppn` (processes per node) option should usually match the number of worker
+processes set by the  `processes` option (whether set on the command line, 
+`cluf_options`, or in `.clufrc`).  So if `ppn` isn't explicitly set in your
+PBS options, but `processes` is set, then it will default to the value of 
+`processes`.  You can still set a different value for ppn, if e.g.  your target 
+function itself spawns proceses.
+
 There are three special options whose names differ from the 
 PBS option names slightly, and options are set to defaults unless specifically
 overridden.
 
 - `'name'`: the name of your subjobs as they appear in the job scheduler.
-	This is also used to name your subjob scripts (by appending `'.pbs'`.  
-	The default is the 
-	format string `'{target_module}-{node_num}-{nodes}'`.  If you override
+	This is also used to name your subjob scripts (by appending `'.pbs'`).
+	The default is the format string `'{target_module}-{node_num}-{nodes}'`.  
+	If you override
 	this you can also use those format fields, and you must at least use
 	the `{node_num}` field to ensure that each of your subjobs gets a 
 	unique name (otherwise the subjob scripts will overwrite one another).
@@ -373,7 +407,7 @@ The `cluf` command has lots of options, which can be specified in three
 different places:
 
  1. as command line arguments, or
- 2. within your target module, inside a dictionary called cluf_options, or
+ 2. within your target module, inside a dictionary called `cluf_options`, or
  3. in the `~/.clufrc` file, in the form of a JSON object
 
 These locations are in decreasing order of precedence, i.e. the command line
