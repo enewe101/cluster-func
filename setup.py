@@ -58,8 +58,8 @@ setup(
     ],
 
     keywords=(
-		'threading multiprocessing scheduling batch processing queue '
-		'queueing cluster'
+		'threading multiprocessing schedule scheduling batch process processing '
+		'queue queueing cluster qsub pbs'
 	),
 
     packages=['cluster_func'],
@@ -70,19 +70,10 @@ setup(
 
 	scripts = [
 		'bin/cluf',
-		#'bin/cluster-func', 'bin/cluster-func_',
-		#'bin/cluster-func-do', 'bin/cluster-func-do_'
 	],
 
 	install_requires=[
 		'iterable-queue',
 	],
-
-	#entry_points= {
-	#	'console_scripts': [
-	#		'cluster-func=cluster_func:main',
-	#		'cluster-func-do=cluster_func:do',
-	#	],
-	#}
 
 )
