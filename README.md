@@ -24,7 +24,7 @@ boilerplate code, which, despite being conceptually straightforward, is tedious
 and error-prone.
 
 Sure, `xargs` is nice, assuming that you can conveniently get the shell to
-spit out your argument values easily.  But that's often not the case, and 
+spit out your argument values.  But that's often not the case, and 
 you may need your arguments to be arbitrary python types, not strings.
 
 And, sure, Hadoop is nice too, assuming you've got a lot of time to burn
