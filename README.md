@@ -33,7 +33,7 @@ memory, and that you've loaded all your data in the hdfs,
 and that the results from your maps don't 
 yield too much data and overwhelm the network.  Oh, and assuming
 you enjoy writing boilerplate mapper and reducer code... wait, maybe hadoop
-isn't so nice... (OK, it does has place)
+isn't so nice... (OK, it does have its place)
 
 ## Basic usage
 Cluster-func is designed for situations where you need to run a single function
