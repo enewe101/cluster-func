@@ -58,12 +58,7 @@ from arg_parser import ClufArgParser
 from exceptions import OptionError, RCFormatError, BinError
 
 # Constants
-DEFAULT_PBS_OPTIONS = {
-	'ppn': 12,
-	'walltime': '12:00:00', 
-	#'pmem': '5799m',
-	'name': '{target}-{subjob}-{num_subjobs}',
-}
+DEFAULT_PBS_OPTIONS = {'name': '{target}-{subjob}-{num_subjobs}'}
 DEFAULT_CLUF_OPTIONS = {
 	'target_func_name': 'target', 
 	'argument_iterable_name': 'args',
@@ -131,17 +126,14 @@ def main():
 
 		# Run the function with the arguments
 		if mode == 'dispatch':
-			print 'dispatching'
 			dispatch(target_module_path, args)
 		elif mode == 'direct':
-			print 'direct'
 			run_direct(target_module_path, args)
 		else:
 			raise OptionError('Unexpected mode: %s' % mode)
 
 	# Handle errors by printing error message followed by the usage
 	except OptionError, e:
-		raise
 		print '\n%s\n' % str(e)
 		parser.print_usage()
 
@@ -181,8 +173,6 @@ def get_options(options, target_module):
 	# Get the module options
 	cluf_options = getattr(target_module, 'cluf_options', {})
 	utils.normalize_options(cluf_options)
-
-	print 'cluf_options', cluf_options
 
 	# Merge commandline options, module options, RC_PARAMS, and default options.
 	options = utils.merge_dicts(
@@ -284,7 +274,6 @@ def dispatch(target_module_path, options):
 
 	# Resolve the options.  In `merge_dicts`, the left-more takes precedence.
 	options = get_options(options, module)
-	print options
 
 	# Get the target function and arguments iterable
 	target_func, iterable = get_target_func_and_iterable(module, options)
@@ -442,7 +431,6 @@ def format_command_statement(target_module_name, node_num, options):
 def get_num_nodes(options, argument_iterable):
 
 	# If nodes was explicitly provided as an option, use that
-	print 'OPTIONS SEEN IN GETNUMNODES', options
 	if 'nodes' in options:
 		return options['nodes']
 
