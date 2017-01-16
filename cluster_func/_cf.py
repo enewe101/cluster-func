@@ -55,7 +55,8 @@ from iterable_queue import IterableQueue
 import utils
 from arguments import Arguments
 from arg_parser import ClufArgParser
-from exceptions import OptionError, RCFormatError, BinError
+from exceptions import OptionError, BinError
+from rc_params import RC_PARAMS
 
 # Constants
 DEFAULT_PBS_OPTIONS = {'name': '{target}-{subjob}-{num_subjobs}'}
@@ -83,23 +84,6 @@ cd {current_directory}
 {command}
 {append_statements}
 '''
-
-# Load the RC_PARAMS (if the user has a .clufrc file).
-try:
-	RC_PARAMS = json.loads(open(os.path.expanduser('~/.clufrc')).read())
-	utils.normalize_options(RC_PARAMS)
-except IOError:
-	RC_PARAMS = {}
-except ValueError as e:
-	print '.clufrc: %s' % str(e)
-	sys.exit(1)
-
-# Validate the RC_PARAMS.  If there's an error, inform user it's in rc_file.
-try:
-	utils.validate_options(RC_PARAMS)
-except OptionError as e:
-	print '.clufrc: %s' % str(e)
-	sys.exit(1)
 
 
 # Entry points for handling the `cluf` command.
@@ -469,7 +453,7 @@ def get_num_nodes(options, argument_iterable):
 		num_iterations = len(argument_iterable)
 
 	# If the iterable doesn't know it's length, we need to count it.
-	except AttributeError:
+	except TypeError:
 		num_iterations = 0
 		for item in argument_iterable:
 			num_iterations += 1

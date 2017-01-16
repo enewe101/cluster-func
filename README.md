@@ -234,8 +234,8 @@ you used.  You can also set options globally in a file at `~/.clufrc`.
 
 All options that can be set on the command line can be set within `cluf_options`
 or `.clufrc`, plus a few extras.  There is one exception, however, which is
-the option to force direct / dispatch mode, which can only be set on
-the command line.
+the option to force direct / dispatch mode (`--mode` or `-m`), which can only 
+be set on the command line.
 
 `cluf_options` should be a dictionary whose keys are the long option names,
 and whose values are strings representing the option values as you would enter
@@ -261,6 +261,10 @@ cluf_options = {
 	"queue": true
 }
 ```
+
+In some cases you may want to use `cluf_options` to simply modify (e.g. add to) 
+the options in `.clufrc`, rather than overriding them.  You can access the 
+`.clufrc` options by importing them, using `from clusterf_func import RC_PARAMS`.
 
 For the most part, any option that can be set on the command line can be set in
 `cluf_options` and `.clufrc`, and vice versa, but there are a few options that
