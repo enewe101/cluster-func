@@ -4,17 +4,15 @@ import re
 import subprocess
 from exceptions import OptionError
 
-CLI_ONLY_OPTIONS = {
-	'mode', 
-}
+NON_CLI_OPTIONS = {'prepend_statements', 'append_statements'}
+CLI_ONLY_OPTIONS = {'mode',}
 NORMALIZED_NON_CLI_OPTIONS = {
 	'jobs_dir', 'target_func_name', 'argument_iterable_name',
 	'queue', 'processes', 'env', 'prepend_script', 'append_script',
-	'prepend_statements', 'append_statements', 'hash', 'key',
+	'prepend_statements', 'append_statements', 'hash', 'hash_cli', 'key',
 	'these_bins', 'num_bins', 'target_cli',
 	'nodes', 'iterations', 'pbs_options'
 }
-
 
 def cpus():
 	""" Number of available virtual or physical CPUs on this system, i.e.
@@ -229,14 +227,25 @@ def normalize_options(options):
 		if isinstance(options['append_script'], basestring):
 			options['append_script'] = options['append_script'].split(',')
 
-	# Convert hash option into a list
-	if 'hash' in options and isinstance(options['hash'], basestring):
-		options['hash'] = unfurl(options['hash'])
+	# Keep both a command line compatible format for the hash option and a 
+	# parsed, python-typed iterable version.  The command line format is needed
+	# for setting up the delegation command in subjob scripts
+	if 'hash' in options :
+
+		# If hash is a string, its already command line compatible.  Save that
+		# version and get the parsed version.
+		if isinstance(options['hash'], basestring):
+			options['hash_cli'] = options['hash']
+			options['hash'] = unfurl(options['hash'])
+
+		# Otherwise it is in a python iterable type. Make a command line format.
+		else:
+			options['hash_cli'] = ','.join([str(h) for h in options['hash']])
 
 	# Parse the key option.  Try to interpret it as an integer specifying the
 	# position of the key argument, otherwise leave it as a string, to be 
 	# interpreted as the name of a keyword argument
-	if 'key' in options and isinstance(options['hash'], basestring):
+	if 'key' in options and isinstance(options['key'], basestring):
 		try:
 			options['key'] = int(options['key'])
 		except ValueError:

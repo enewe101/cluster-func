@@ -6,4 +6,5 @@ class OptionError(ValueError):
 class RCFormatError(ValueError):
 	pass
 
-
+class BinError(KeyError):
+	pass

@@ -55,35 +55,34 @@ from iterable_queue import IterableQueue
 import utils
 from arguments import Arguments
 from arg_parser import ClufArgParser
-from exceptions import OptionError, RCFormatError
+from exceptions import OptionError, RCFormatError, BinError
 
 # Constants
 DEFAULT_PBS_OPTIONS = {
 	'ppn': 12,
 	'walltime': '12:00:00', 
 	#'pmem': '5799m',
-	'stdout': '{target}-{node_num}-{nodes}.stdout',
-	'stderr': '{target}-{node_num}-{nodes}.stderr',
-	'name': '{target}-{node_num}-{nodes}',
+	'name': '{target}-{subjob}-{num_subjobs}',
 }
 DEFAULT_CLUF_OPTIONS = {
 	'target_func_name': 'target', 
 	'argument_iterable_name': 'args',
 	'these_bins': [0],
 	'num_bins': 1,
-	'queue': True, 
+	'queue': False, 
 	'target_cli': [],
 	'env': {},
-	'processes': utils.cpus()
+	'processes': utils.cpus(),
+	'pbs_options': {}
 }
-NON_CLI_OPTIONS = ['prepend_statements', 'append_statements']
-	 
+ 
 DEFAULT_GUILLIMIN_MODULES	= ['Python/2.7.10']
 TEMPLATE = '''#!/bin/bash
 {pbs_option_statements}
-{additional_statements}
 cd {current_directory}
+{prepend_statements}
 {command}
+{append_statements}
 '''
 
 # Load the RC_PARAMS (if the user has a .clufrc file).
@@ -281,21 +280,43 @@ def dispatch(target_module_path, options):
 	'''
 
 	# Import the target module, get needed members.
-	target_module_name, target_module = load_module(target_module_path)
+	target_module_name, module = load_module(target_module_path)
 
 	# Resolve the options.  In `merge_dicts`, the left-more takes precedence.
-	options = get_options(options, target_module)
+	options = get_options(options, module)
 	print options
 
 	# Get the target function and arguments iterable
-	argument_iterable = getattr(target_module, options['argument_iterable_name'])
-	target_func = getattr(target_module, options['target_func_name'])
+	target_func, iterable = get_target_func_and_iterable(module, options)
 
 	# How many nodes will we use?  We might need to count the arguments iterable.
-	options['nodes'] = get_num_nodes(options, argument_iterable)
+	options['nodes'] = get_num_nodes(options, iterable)
 
 	# Ensure the jobs dir exists.
 	utils.ensure_exists(options['jobs_dir'])
+
+	# Print a message about what will be hashed.  Reduces user errors from
+	# badly formatted hash options (which would silently cause all of the work
+	# to be done by a single node)
+	if 'hash' in options:
+		print 'Dividing work by hashing arguments'
+		positional_args = [str(h) for h in options['hash'] if isinstance(h, int)]
+		keyword_args = [
+			str(h) for h in options['hash'] if isinstance(h, basestring)]
+		if len(positional_args) > 0:
+			print '\t- positional arguments: %s' % ', '.join(positional_args)
+		if len(keyword_args) > 0:
+			print '\t- keyword arguments: %s' % ', '.join(keyword_args)
+
+	elif 'key' in options:
+		arg_type = 'positional' if isinstance(options['key'], int) else 'keyword'
+		print (
+			'Work will be explicitly assigned using %s argument %s' 
+			% (arg_type, options['key'])
+		)
+
+	else:
+		print 'Dividing work based on argument order'
 
 	# Make each job script, and possibly enqueue it
 	for node_num in range(options['nodes']):
@@ -312,16 +333,14 @@ def dispatch(target_module_path, options):
 			print 'submitting job %d' % node_num
 			print check_output(['qsub %s' % script_path], shell=True)
 		else:
-			print 'created script for job %d' % node_num
+			print 'created script for subjob %d' % node_num
 
 
 def resolve_script_path(target_module_name, node_num, options):
 	script_name_fmt = options['pbs_options'].get(
 		'name', DEFAULT_PBS_OPTIONS['name'])
 	script_name = script_name_fmt.format(
-		target=target_module_name, 
-		node_num=node_num, nodes=options['nodes']
-	)
+		target=target_module_name, subjob=node_num, num_subjobs=options['nodes'])
 	return os.path.join(options['jobs_dir'], script_name + '.pbs')
 
 
@@ -374,7 +393,8 @@ def format_script(target_module_name, node_num, options):
 	# Format the pbs script for this job
 	return TEMPLATE.format(
 		pbs_option_statements=pbs_option_statements,
-		additional_statements=additional_statements,
+		prepend_statements=prepend_statements,
+		append_statements=append_statements,
 		current_directory=os.getcwd(),
 		command=command
 	)
@@ -399,9 +419,17 @@ def format_command_statement(target_module_name, node_num, options):
 		'-a', options['argument_iterable_name'],
 	])
 
+	# Add the hash option if any
+	if 'hash' in options:
+		command_tokens.extend(['-x', options['hash_cli']])
+
+	# Add the key option if any
+	if 'key' in options:
+		command_tokens.extend(['-k', str(options['key'])])
+
 	# Add the processors option if any
-	if 'ppn' in options['pbs_options']:
-		command_tokens.extend(['-p', str(options['pbs_options']['ppn'])])
+	if 'processes' in options:
+		command_tokens.extend(['-p', str(options['processes'])])
 
 	# Place the pass-through command line args (if any) after a '--' separator
 	if len(options['target_cli']):
@@ -425,20 +453,27 @@ def get_num_nodes(options, argument_iterable):
 			'number of inputs per node.'
 		)
 
+	print 'Counting iterations to determine number of nodes needed...'
 	# The number of nodes will be based on the supplied number of iterations per
 	# node.  We need to count total iterations.  Try calling len directly on
 	# the argument iterable (this will work for lists, e.g.)
 	try:
-		num_members = len(argument_iterable)
+		num_iterations = len(argument_iterable)
 
 	# If the iterable doesn't know it's length, we need to count it.
 	except AttributeError:
-		num_members = 0
+		num_iterations = 0
 		for item in argument_iterable:
-			num_members += 1
+			num_iterations += 1
 
 	# Calculate the number of nodes needed based on iterations per node
-	nodes = int(math.ceil(num_members / float(options['iterations'])))
+	nodes = int(math.ceil(num_iterations / float(options['iterations'])))
+
+	print (
+		'\t%d iterations, will be divided over %d nodes (~%d iterations each)'
+		% (num_iterations, nodes, options['iterations'])
+	)
+	return nodes
 
 
 def format_pbs_statements(target_module_name, node_num, options):
@@ -489,40 +524,37 @@ def format_pbs_statements(target_module_name, node_num, options):
 	if 'ppn' in pbs_options:
 		pbs_option_statements.append(
 			'#PBS -l nodes=1:ppn=%s' % pbs_options['ppn'])
-
-	# Specify the stdout path.  If none was given, use the default.
-	try:
-		stdout_path = pbs_options['stdout'].format(
-			target=target_module_name, node_num=node_num, nodes=nodes
-		)
-	except KeyError:
-		stdout_path = DEFAULT_PBS_OPTIONS['stdout'].format(
-			target=target_module_name, node_num=node_num, nodes=nodes
-		)
-	pbs_option_statements.append('#PBS -o ' + stdout_path)
-
-	# Specify the stderr path.  If none was given, use the default.
-	try:
-		stderr_path = pbs_options['stderr'].format(
-			target=target_module_name, node_num=node_num, nodes=nodes
-		)
-	except KeyError:
-		stderr_path = DEFAULT_PBS_OPTIONS['stderr'].format(
-			target=target_module_name, node_num=node_num, nodes=nodes
-		)
-	pbs_option_statements.append('#PBS -e ' + stderr_path)
+	elif 'processes' in options:
+		pbs_option_statements.append(
+			'#PBS -l nodes=1:ppn=%s' % options['processes'])
 
 	# Specify the name of the job (this is what will display, e.g., when
 	# calling qstat)
-	try:
-		job_name = pbs_options['name'].format(
-			target=target_module_name, node_num=node_num, nodes=nodes
-		)
-	except KeyError:
-		job_name = DEFAULT_PBS_OPTIONS['name'].format(
-			target=target_module_name, node_num=node_num, nodes=nodes
-		)
+	job_name_formatter = pbs_options.get('name', DEFAULT_PBS_OPTIONS['name'])
+	job_name = job_name_formatter.format(
+		target=target_module_name, subjob=node_num, num_subjobs=nodes
+	)
 	pbs_option_statements.append('#PBS -N ' + job_name)
+
+	# Specify the stdout path.  If none was given, use the default.
+	stdout_path_formatter = pbs_options.get(
+		'stdout', job_name_formatter + '.stdout')
+	stdout_relative_path = stdout_path_formatter.format(
+		target=target_module_name, subjob=node_num, num_subjobs=nodes
+	)
+	stdout_relative_path = os.path.expanduser(stdout_relative_path)
+	stdout_path = os.path.join(options['jobs_dir'], stdout_relative_path)
+	pbs_option_statements.append('#PBS -o ' + stdout_path)
+
+	# Specify the stderr path.  If none was given, use the default.
+	stderr_path_formatter = pbs_options.get(
+		'stderr', job_name_formatter + '.stderr')
+	stderr_relative_path = stderr_path_formatter.format(
+		target=target_module_name, subjob=node_num, num_subjobs=nodes
+	)
+	stderr_relative_path = os.path.expanduser(stderr_relative_path)
+	stderr_path = os.path.join(options['jobs_dir'], stderr_relative_path)
+	pbs_option_statements.append('#PBS -e ' + stderr_path)
 
 	return '\n'.join(pbs_option_statements)
 
@@ -607,15 +639,7 @@ def run_direct( target_module_path, options
 	options = get_options(options, module)
 
 	# Get the target function and arguments iterable.
-	target_func = getattr(module, options['target_func_name'])
-	iterable = getattr(module, options['argument_iterable_name'])
-
-	# What we call the "iterable" may be an iterable or a callable that yields
-	# an iterable.  Resolve that now.
-	try:
-		iter(iterable)
-	except TypeError:
-		iterable = iterable()
+	target_func, iterable = get_target_func_and_iterable(module, options)
 
 	# Make a queue on which to put arguments
 	args_queue = IterableQueue()
@@ -634,6 +658,24 @@ def run_direct( target_module_path, options
 	for args in generate_args_subset(iterable, options):
 		args_producer.put(args)
 	args_producer.close()
+
+
+def get_target_func_and_iterable(target_module, options):
+
+	try:
+		target_func = getattr(target_module, options['target_func_name'])
+		iterable = getattr(target_module, options['argument_iterable_name'])
+	except AttributeError, e:
+		raise OptionError(str(e))
+
+	# What we call the "iterable" may be an iterable or a callable that yields
+	# an iterable.  Resolve that now.
+	try:
+		iter(iterable)
+	except TypeError:
+		iterable = iterable()
+
+	return target_func, iterable
 
 
 def pass_through_args(target_module_path, args):
@@ -720,7 +762,7 @@ def generate_args_subset(iterable, options):
 		for args in as_arguments(iterable):
 			hashable = ''.join([
 				str(args[i])
-				for i in options['hash'] if i < len(args)
+				for i in options['hash'] if i in args
 			])
 			this_bin = utils.binify(hashable, options['num_bins'])
 			if this_bin in options['these_bins']:
@@ -729,8 +771,15 @@ def generate_args_subset(iterable, options):
 	# However, if "key" is specified, then the key'th argument designates
 	# the bin
 	elif 'key' in options:
-		for args in as_arguments(iterable):
-			if args[options['key']] in options['these_bins']:
+		for i, args in enumerate(as_arguments(iterable)):
+			try:
+				key = args[options['key']]
+			except KeyError:
+				raise BinError(
+					'Argument %s was not found in iteration %d' 
+					% (repr(options['key']), i)
+				)
+			if key in options['these_bins']:
 				yield args
 
 	# By default, work is dealt around to each bin in the order that it is

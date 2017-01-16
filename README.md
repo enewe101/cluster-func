@@ -358,25 +358,27 @@ PBS options, but `processes` is set, then it will default to the value of
 function itself spawns proceses.
 
 There are three special options whose names differ from the 
-PBS option names slightly, and options are set to defaults unless specifically
-overridden.
+PBS option names slightly, and these options are set to defaults unless 
+specifically overridden.
 
 - `'name'`: the name of your subjobs as they appear in the job scheduler.
 	This is also used to name your subjob scripts (by appending `'.pbs'`).
-	The default is the format string `'{target_module}-{node_num}-{nodes}'`.  
+	The default is the format string `'{target}-{subjob}-{num_subjobs}'`,
+	with the fields being interpolated by the target module's name, the 
+	subjob number, and the total number of subjobs respectively.
 	If you override
 	this you can also use those format fields, and you must at least use
-	the `{node_num}` field to ensure that each of your subjobs gets a 
+	the `{subjob}` field to ensure that each of your subjobs gets a 
 	unique name (otherwise the subjob scripts will overwrite one another).
 - `'stdout'`: the path at which to place stdout captured from your subjobs,
-	relative to the `jobs_dir` if set (if not set it defaults to the current
-	working directory).
-	The default is `'{target_module}-{node_num}-{nodes}.stdout'`
+	relative to the `jobs_dir` if set (if not set then it is relative to the 
+	current working directory).
+	This defaults to the subjob name plus `'.stdout'`
 	As for the `'name'` option, 
 	if you override this, make sure that the paths for subjobs
 	are unique by using the `{node_num}` field somewhere.
-- `'stderr'`: similar to `'stdout'`.  Defaults to 
-	`'{target_module}-{node_num}-{nodes}.stderr'`
+- `'stderr'`: similar to `'stdout'`.  Defaults to the subjob name plus 
+	`'.stderr'`
 
 The combinations of PBS options that are available and/or required depends on 
 the setup of your cluster.  Usually a system is configured with smart defaults
