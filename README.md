@@ -46,6 +46,10 @@ Cluster-func assumes that you have defined
 these in the form of a *callable* and an *iterable* within a python script, and
 then it handles the business of spreading the work across cores and machines.
 
+The great thing about this approach is that you unavoidably define these two
+things when you write your code for a single process anyway.  So you'll get
+multiprocessing and cluster processing basically for free!
+
 The tool has two modes.  In **direct mode**, it runs your function on the cpus of
 a single machine.  In **dispatch mode**, it breaks the work into subjobs that can
 be run on separate machines, and optionally submits them to a job scheduler
