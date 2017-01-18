@@ -21,7 +21,7 @@ setup(
 	# single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.0.4',
+    version='0.0.5',
 
     description='Run a function many times on many processes / machines',
     long_description=long_description,
@@ -73,7 +73,7 @@ setup(
 	],
 
 	install_requires=[
-		'iterable-queue',
+		'iterable-queue>=1.0.0',
 	],
 
 )
