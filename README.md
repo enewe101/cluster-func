@@ -98,7 +98,9 @@ will break the work into 10 subjobs, and submit them using qsub.  It does
 this by writing small shell scripts, each of which is responsible for calling 
 the target function on a subset of the arguments yielded by the iterable.
 
-(To learn about setting PBS directives for your subjob scripts, see **PBS directives**)
+(To learn about setting PBS directives for your subjob scripts, see **<a
+href="#pbs-options">PBS
+options</a>** below.)
 
 Because each subjob script is a valid shell script, you can manually run them
 on separate machines in case they aren't part of a cluster that uses `qsub`.
@@ -220,7 +222,7 @@ In the command above, the argument in position 2 (the third argument)
 the bin for each iteration.  You can also specify a keyword argument by name.
 
 You should only use direct assignment if you really have to, because it's more
-error prone, and it makes it more difficult to change the number of bins.  
+error prone, and it makes it more difficult to change the number of bins.
 It also
 introduces job division logic into your script which `cluf` was designed to
 prevent.
@@ -345,9 +347,8 @@ And so will this:
 ```bash
 cluf my_script.py --nodes=4 --env=MYENV=foo\\\ bar
 ```
-will.
 
-### PBS options
+### <a name="pbs-options">PBS options</a>
 (This option cannot be set on the command line.)
 Portable Batch System options control how the cluster scheduler schedules your
 job, and allows you to request specific compute resources and specify the
