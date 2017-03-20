@@ -74,7 +74,7 @@ $ cluf my_script.py --target=my_func --args=my_iterable --processes=12	# short o
 If `args` yields a tuple, its contents will be unpacked and interpreted as the
 positional arguments for one invocation of the target function.  If you need
 greater control, for example, to provide keyword arguments, then see 
-**Arguments iterable**
+**<a href="#arguments-iterable">Arguments iterable</a>**
 
 `args` can also be a callable that *returns* an iterable (including a generator),
 which is often more convenient.
@@ -89,7 +89,8 @@ uses the `qsub` command for job submission.  But you can still use `cluf` to
 spread work between machines don't use `qsub`.
 
 Dispatch mode is implicitly invoked when you specify a number of compute nodes
-to use (you can force the running mode using `--mode`, see **Reference**).
+to use (you can force the running mode using `--mode`, see **<a
+href="#reference">Reference</a>**).
 For example, this command:
 ```bash
 $ cluf my_script.py --nodes=10 --queue	# short options -n, -q
@@ -98,7 +99,9 @@ will break the work into 10 subjobs, and submit them using qsub.  It does
 this by writing small shell scripts, each of which is responsible for calling 
 the target function on a subset of the arguments yielded by the iterable.
 
-(To learn about setting PBS directives for your subjob scripts, see **PBS directives**)
+(To learn about setting PBS directives for your subjob scripts, see **<a
+href="#pbs-options">PBS
+options</a>** below.)
 
 Because each subjob script is a valid shell script, you can manually run them
 on separate machines in case they aren't part of a cluster that uses `qsub`.
@@ -108,12 +111,12 @@ before submitting it.
 
 To divide the work properly, it's important that your argument iterable yields
 the same arguments in the same order on each machine.  If you can't or don't
-want write your iterable that way, see **How work is divided** for other options.
+want write your iterable that way, see **<a href="#how-work-is-divided">How work is divided</a>** for other options.
 
 And that's the end of the basic usage guide.  This will cover you for the most 
 basic usecases.  To learn about more cool features, read on!
 
-## Arguments iterable
+## <a name="arguments-iterable">Arguments iterable</a>
 The main usecase imagined is one where the arguments iterable yields either
 single, bare arguments, or tuples of positional arguments.  Of course, the 
 Python language provides a very
@@ -134,7 +137,7 @@ Arguments(0, 1, 2, 3, four=4, five=5, six=6)
 >>> my_target(0, *[1,2,3], four=4, **{'five':5, 'six':6})
 ```
 
-## How work is divided 
+## <a name="how-work-is-divided">How work is divided</a>
 By default, work is divided by assuming that the arguments iterator will yield
 the same arguments in the same order during each subjob.  Each subjob can then
 execute the target function only on those arguments assigned to it.  
@@ -220,7 +223,7 @@ In the command above, the argument in position 2 (the third argument)
 the bin for each iteration.  You can also specify a keyword argument by name.
 
 You should only use direct assignment if you really have to, because it's more
-error prone, and it makes it more difficult to change the number of bins.  
+error prone, and it makes it more difficult to change the number of bins.
 It also
 introduces job division logic into your script which `cluf` was designed to
 prevent.
@@ -270,7 +273,7 @@ For the most part, any option that can be set on the command line can be set in
 `cluf_options` and `.clufrc`, and vice versa, but there are a few options that
 can *only* be set in `cluf_options` and `.clufrc`.  We cover those now along
 with some options that are just less convenient to set on the command line.  
-See **Reference** for all available options.
+See **<a href="#reference">Reference</a>** for all available options.
 
 ### Environment variables
 (Note: This option can be set on the command line but is somewhat less 
@@ -345,9 +348,8 @@ And so will this:
 ```bash
 cluf my_script.py --nodes=4 --env=MYENV=foo\\\ bar
 ```
-will.
 
-### PBS options
+### <a name="pbs-options">PBS options</a>
 (This option cannot be set on the command line.)
 Portable Batch System options control how the cluster scheduler schedules your
 job, and allows you to request specific compute resources and specify the
@@ -424,7 +426,7 @@ that actually runs the subjob within subjob scripts.  Each element of the list
 should be a valid shell statement which will appear on its own line when merged
 into the jobscripts.  The options aren't available on the command line.
 
-# Reference
+# <a name="reference">Reference</a>
 
 The `cluf` command has lots of options, which can be specified in three
 different places:

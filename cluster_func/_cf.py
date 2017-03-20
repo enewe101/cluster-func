@@ -280,7 +280,8 @@ def dispatch(target_module_path, options):
 	options = get_options(options, module)
 
 	# Get the target function and arguments iterable
-	target_func, iterable = get_target_func_and_iterable(module, options)
+	target_func, iterable, reducer_func= get_target_func_and_iterable(
+		module, options)
 
 	# How many nodes will we use?  We might need to count the arguments iterable.
 	options['nodes'] = get_num_nodes(options, iterable)
@@ -335,29 +336,6 @@ def resolve_script_path(target_module_name, node_num, options):
 	script_name = script_name_fmt.format(
 		target=target_module_name, subjob=node_num, num_subjobs=options['nodes'])
 	return os.path.join(options['jobs_dir'], script_name + '.pbs')
-
-
-def resolve_options(
-	primary_options, secondary_options, defaults={}, keys=None
-):
-
-	# If keys is provided, use those keys (and only those keys).
-	# But by default, consider the union of all keys in the provided dictionaries
-	if keys is None:
-		keys = set(
-			primary_options.keys() + secondary_options.keys() + defaults.keys()
-		)
-
-	resolved_options = {}
-	for key in all_keys:
-		resolved_options[key] = (
-			primary_options.get(key, None)
-			or secondary_options.get(key, None)
-			or defaults.get(key, None)
-		)
-
-	return resolved_options
-
 
 
 def format_script(target_module_name, node_num, options):
@@ -630,18 +608,34 @@ def run_direct(target_module_path, options):
 	options = get_options(options, module)
 
 	# Get the target function and arguments iterable.
-	target_func, iterable = get_target_func_and_iterable(module, options)
+	target_func, iterable, reducer_func = get_target_func_and_iterable(
+		module, options)
 
 	# Make a queue on which to put arguments
 	args_queue = IterableQueue()
+	if reducer_func is not None:
+		results_queue = IterableQueue()
 
 	# Start the pool of workers
 	for proc_num in range(options.get('processes', utils.cpus())):
 		proc = Process(
 			target=worker, 
-			args=(target_func, args_queue.get_consumer(),)
+			args=(
+				target_func,
+				args_queue.get_consumer(),
+				results_queue.get_producer() if reducer_func else None
+			)
 		)
 		proc.start()
+
+	# Start a process for reduction, if we have a reducer function
+	if reducer_func
+		# Start the reducer process, if needed
+		reducer_proc = Process(
+			target=reducer_func,
+			args=(results_queue.get_consumer(),)
+		)
+		reducer_proc.start()
 
 	# Start loading work onto the args queue
 	args_producer = args_queue.get_producer()
@@ -649,6 +643,7 @@ def run_direct(target_module_path, options):
 	for args in generate_args_subset(iterable, options):
 		args_producer.put(args)
 	args_producer.close()
+
 
 
 def get_target_func_and_iterable(target_module, options):
@@ -666,7 +661,8 @@ def get_target_func_and_iterable(target_module, options):
 	except TypeError:
 		iterable = iterable()
 
-	return target_func, iterable
+	# TODO: try to return reducer func instead of None
+	return target_func, iterable, None
 
 
 def pass_through_args(target_module_path, args):
@@ -693,14 +689,23 @@ def pass_through_args(target_module_path, args):
 
 
 
-def worker(target_func, args_consumer):
+def worker(target_func, args_consumer, results_producer):
 	'''
 	Runs the callable `target_func` repeatedly inside a single process.  
 	Consumes sets of arguments from the IterableQueue.ConsumerQueue 
 	`args_consumer`, unpacks them, and executes target_func with them.
 	'''
+	# Continually run target_func on arguments from the arguments queue
 	for args in args_consumer:
-		target_func(*args.args, **args.kwargs)
+		result = target_func(*args.args, **args.kwargs)
+
+		# Pack results onto the queue if we're running a reducer
+		if result_producer:
+			result_producer.put(result)
+
+	# Close the producer when there are no more results to put
+	if result_producer:
+		result_prducer.close()
 
 
 def generate_args_subset(iterable, options):

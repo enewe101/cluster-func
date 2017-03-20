@@ -57,7 +57,11 @@ class ClufArgParser(object):
 			)
 		)
 		parser.add_argument(
-			'-p', '--processes', type=int, help='Number of processors to use.'
+			'-p', '--processes', type=int, help=(
+			'Number of worker processes to spawn (i.e. number of concurrent '
+			'target functions running) per machine.  In direct mode, all '
+			'processing is on one machine, so this is the total number of '
+			'worker processes processes.'
 		)
 		parser.add_argument(
 			'-b', '--bins', 
@@ -65,16 +69,17 @@ class ClufArgParser(object):
 				'Optionally specify a portion of the work to be done. '
 				'Should take the form "x/y" meaning "do the x-th section out of '
 				'y total sections.  For example, "0/2" means divide the work '
-				'into two halves, and do the first (0th) half.  Note that x and '
-				'y should be integers, and x should be from 0 to y-1 '
-				'inclusive.  This option only takes effect in direct mode.'
+				'into two halves, and do the first (0th) half.  x should be '
+				'a comma-separated list of integer ranges, and y should be an '
+				'integer.  E.g. 0-2,5/6 means do parts 0,1,2, and 5 out of '
+				'6 parts.  This option only takes effect in direct mode.'
 			)
 		)
 		parser.add_argument(
 			'-e', '--env',
 			help=(
 				'Provide environment variables that should be set when running '
-				'sub-jobs.  This is for use in dispatch mode, since job scripts '
+				'subjobs.  This is for use in dispatch mode, since job scripts '
 				'will run in a different environment.  In direct mode, the '
 				'environment is inherited.  The value of this option should be '
 				'an enquoted string of space-separated key=value pairs.  For '
@@ -139,12 +144,13 @@ class ClufArgParser(object):
 		group.add_argument(
 			'-k', '--key',
 			help=(
-				'Integer specifying the positional argument to use as the bin for '
-				'each iteration.  That key argument should always take on a value '
-				'that is an integer between 0 and num_bins-1.  This should only '
-				'be used if you really need to control binning.  Prefer to rely on '
-				'automatic binning (if your iterable is stable), or use the -x'
-				'option, which is more flexible and less error-prone.'
+				'Integer specifying the positional argument to use as the bin '
+				'for each iteration.  That key argument should always take on '
+				'a value that is an integer between 0 and num_bins-1.  This '
+				'should only be used if you really need to control binning.  '
+				'Prefer to rely on automatic binning (if your iterable is '
+				'stable), or use the -x option, which is more flexible '
+				'and less error-prone.'
 			)
 		)
 
