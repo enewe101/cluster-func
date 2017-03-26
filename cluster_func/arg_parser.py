@@ -62,6 +62,7 @@ class ClufArgParser(object):
 			'target functions running) per machine.  In direct mode, all '
 			'processing is on one machine, so this is the total number of '
 			'worker processes processes.'
+			)
 		)
 		parser.add_argument(
 			'-b', '--bins', 
