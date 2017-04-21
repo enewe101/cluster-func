@@ -1,0 +1,35 @@
+when invoked by command line, we can supply a target, args, and a reducer.
+Theres no notion of a return value (although the functions could print to
+stdout).  
+
+When invoked as a library, we can supply these, and there is a notion
+of a return value.  This can take different forms:
+	
+cluf(args, target, reduce=iter)
+	-> returns an iterator of whatever the return values are from target
+	-> the iterator must be consumed or the main process won't exit
+		-> really?
+
+cluf(args, target, reduce=None)
+	-> None is returned.  Any return values from target are discarded
+
+cluf(args, target, reduce=list)
+	-> A list of the return values from target is compiled and returned 
+	-> once all iterations of target are completed.
+
+
+args1 = some_generator()
+target1 = lambda x: something(x)
+
+args2 = cluf(args1, target1)
+target2 = lambda x: something_else(x)
+
+final_result = cluf(args2, target2, reduce=list)
+
+There doesn't seem to be any benefit to allowing a reduce
+argument to be passed.  It would be better for `cluf` to always return an
+iterator over results.  The caller could ignore the returned iterator, call
+list on it, or call their reducer on it.  That seems more readable and less
+complicated.  The question is, though: if the returned iterator is never
+consumed, will the program terminate?  And if it does terminate, does it do so
+only after `target` has been called on all the values in `args`?

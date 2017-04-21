@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 '''
 This submodule defines core functionality of the cluster-func module.  The two
-most prominent functions are `dispatch` and `do_this`, whose purposes are
+most prominent functions are `dispatch` and `run_direct`, whose purposes are
 described in the following paragraphs.
 
 Note that this module and its contents are not intended to be used directly
 (any member might be changed or removed in the future).  Rather, the command
-line tools `cluster-func` and `cluster-func-do` should be used, which rely on
-this module.
+line tools `cluf` should be used, which calls members of this module.
 
 `dispatch` writes a series of files (bash scripts) each of which invokes a
 target function many times using multiprocessing.  The main point of `dispatch`
@@ -15,26 +14,24 @@ is to break down a large amount of invokations into separate chunks which can
 each be run on different machines, without having to divide the work ahead of
 time and without interprocess communication.
 
-Each script calls the target function indirectly via a call to `do_this`.
+Each script calls the target function indirectly via a call to `run_direct`.
 These scripts are qsub-compatible job scripts that are optionally submitted to
-to a scheduler using qsub.  They can also be run manually using bash as long as
-no module load statements were included (see "Loading Modules" in the
-documentation).  Each script represents multiprocessed invocations of the
-target function against a subset of its argument sets on a single machine, with
-separate scripts intented to run on separate machines.
+to a scheduler using qsub.  Each script represents multiprocessed invocations
+of the target function against a subset of its argument sets on a single
+machine, with separate scripts intented to run on separate machines.
 
-`do_this` calls a target function many times using multiprocessing on a single
-machine.  The main point of `do_this` is to factor out logic needed to spawn a
+`run_direct` calls a target function many times using multiprocessing on a single
+machine.  The main point of `run_direct` is to factor out logic needed to spawn a
 pool of workers and divide work among them locally on a machine.
 
-The functions `dispatch` and `do_this` are tightly coupled to the command line
+The functions `dispatch` and `run_direct` are tightly coupled to the command line
 tools `cluster-func` and `cluster-func-do`, which are the intended entry
 points.
 
-Rather than call `dispatch` and `do_this` directly, those commandline tools
+Rather than call `dispatch` and `run_direct` directly, those commandline tools
 call other functions (respectively `main` and `do`) that first handle the
 business of parsing command line arguments, and then delegate to `dispatch` and
-`do_this`.  That separation is intended to isolate command line invocation
+`run_direct`.  That separation is intended to isolate command line invocation
 logic from the job-division and multiprocessing logic.
 '''
 
@@ -112,11 +109,28 @@ def main():
 		mode = args.pop('mode')
 		target_module_path = args.pop('target_module_path')
 
+		# Pass the arguments in target_cli (if any) through to the target
+		# module by putting them in sys.argv before loading the target module.
+		pass_through_args(target_module_path, options['target_cli'])
+
+		# Import the target module
+		target_module_name, module = load_module(target_module_path)
+
+		# Resolve the options, which come from command line arguments, the 
+		# target module, an RC_PARAMS file, and defualts defined in this
+		# module.
+		cluf_options = getattr(module, 'cluf_options', {})
+		options = get_options(args, cluf_options)
+
+		# Get the target function, arguments iterable, and reducer
+		target_func, iterable, reducer_func= get_target_func_and_iterable(
+			module, options)
+
 		# Run the function with the arguments
 		if mode == 'dispatch':
-			dispatch(target_module_path, args)
+			dispatch(target_module_name, iterable, options)
 		elif mode == 'direct':
-			run_direct(target_module_path, args)
+			run_direct(target_func, iterable, reducer_func, options)
 		else:
 			raise OptionError('Unexpected mode: %s' % mode)
 
@@ -171,15 +185,30 @@ def find_module(target_module_path):
 	return full_path, target_module_name, found_module
 
 
-def get_options(options, target_module):
+def get_options(arg_options, cluf_options):
+	"""
+	Sources options from four possible locations, and merges them together.
+	In order of highest to lowest precedence, options are sourced from:
 
-	# Get the module options
-	cluf_options = getattr(target_module, 'cluf_options', {})
+	 - The `options` argument supplied to this function, which is used to pass
+	   in parsed commandline arguments;
+	 - `target_module` argument, which is the module that contains the
+	   	arguments iterable and the target function, which is inspected for a
+	   	global member called `cluf_options` from which options will be sourced;
+	 - `RC_PARAMS`, the option settings from the `~/.clufrc` file; and
+	 - `DEFAULT_CLUF_OPTIONS`, the option defaults defined in this module.
+
+	After merging options from these four sources, the options are validated,
+	then the merged options are returned.
+	"""
+
+	# Normalize the cluf_options, which are options that were defined within
+	# python as a dictionary
 	utils.normalize_options(cluf_options)
 
 	# Merge commandline options, module options, RC_PARAMS, and default options.
 	options = utils.merge_dicts(
-		options, cluf_options, RC_PARAMS, DEFAULT_CLUF_OPTIONS
+		arg_options, cluf_options, RC_PARAMS, DEFAULT_CLUF_OPTIONS
 	)
 
 	# Validate the merged options
@@ -188,7 +217,7 @@ def get_options(options, target_module):
 	return options
 
 
-def dispatch(target_module_path, options):
+def dispatch(target_module_name, iterable, options):
 	'''
 	Creates a set of scripts that, when run, will each perform a portion of
 	a large job.  The job is defined by the python module located at 
@@ -271,17 +300,6 @@ def dispatch(target_module_path, options):
 
 	[No outputs]
 	'''
-
-	# Import the target module, get needed members.
-	target_module_name, module = load_module(target_module_path)
-	#target_module_name, module = load_source(target_module_path)
-
-	# Resolve the options.  In `merge_dicts`, the left-more takes precedence.
-	options = get_options(options, module)
-
-	# Get the target function and arguments iterable
-	target_func, iterable, reducer_func= get_target_func_and_iterable(
-		module, options)
 
 	# How many nodes will we use?  We might need to count the arguments iterable.
 	options['nodes'] = get_num_nodes(options, iterable)
@@ -529,7 +547,7 @@ def format_pbs_statements(target_module_name, node_num, options):
 	return '\n'.join(pbs_option_statements)
 
 
-def run_direct(target_module_path, options):
+def run_direct(target_func, iterable, reducer_func, options):
 	'''
 	This function performs a portion of an embarassingly parallel problem that
 	is defined in the python module located at `target_module_path`.
@@ -562,54 +580,49 @@ def run_direct(target_module_path, options):
 		target function and the arguments iterable (and possibly other
 		configuration options for the job.
 
-	* these_bins [list(int)] - Controls the particular subset of argument sets 
-		from the arguments iterable used to run the target function.  Must be
-		an integer from 0 to `num_bins`-1 inclusive.  
+	* options [dict] - dictionary of options that control how the target
+		function is called from the arguments iterable.  The following keys are
+		recognized:
 
-	* num_bins [int] - Number of portions into which the work has been split.
-		Consequently, the number of iterations of the target function that 
-		will be performed is approximately equal to 1 / `num_bins` times the
-		number of argument sets yielded by the arguments iterable.  Can be
-		1 in which case the full job will be processed.  Must be greater than 0.
-		In normal usage, this should be equal to the number of machines over
-		which the work has been spread.
+		- these_bins [list(int)] - Controls the particular subset of argument 
+			sets from the arguments iterable used to run the target function.
+			Must be an integer from 0 to `num_bins`-1 inclusive.  
 
-	* processes [int|None] - number of worker processes to be concurrently 
-		spawned for repeated execution of the target function.  By default
-		this is equal to the number of cpus available on the machine.
+		- num_bins [int] - Number of portions into which the work has been split.
+			Consequently, the number of iterations of the target function that
+			will be performed is approximately equal to 1 / `num_bins` times
+			the number of argument sets yielded by the arguments iterable.  Can
+			be 1 in which case the full job will be processed.  Must be greater
+			than 0.  In normal usage, this should be equal to the number of
+			machines over which the work has been spread.
 
-	* target_func_name [str] - name of the target function.  It can actually be
-		an identifier for any callable in the module's namespace.  Default is
-		to look for a callable called "target".
+		- processes [int|None] - number of worker processes to be concurrently 
+			spawned for repeated execution of the target function.  By default
+			this is equal to the number of cpus available on the machine.
 
-	* argument_iterable_name [str] - name of the iterable that yields argument
-		sets.  This iterable should yield tuples of arguments; each tuple will
-		be unpacked and passed as the arguments list to the target function.
-		If an invocation involves a single argument, it need not be within a 
-		tuple (unless that single argument is itself a tuple).
+		- target_func_name [str] - name of the target function.  It can 
+			actually be an identifier for any callable in the module's
+			namespace.  Default is to look for a callable called "target".
 
-	* target_cli [list] - Command line arguments intended for interpretation
-		by the target module.  These are passed through, and, when the 
-		target module is loaded (during execution of the scripts output by this
-		function), those arguments will appear in sys.argv, just as they would
-		if the target module were directly run in a shell.
+		- argument_iterable_name [str] - name of the iterable that yields 
+			argument sets.  This iterable should yield tuples of arguments;
+			each tuple will be unpacked and passed as the arguments list to the
+			target function.  If an invocation involves a single argument, it
+			need not be within a tuple (unless that single argument is itself a
+			tuple).
+
+		- target_cli [list] - Command line arguments intended for interpretation
+			by the target module.  These are passed through, and, when the
+			target module is loaded (during execution of the scripts output by
+			this function), those arguments will appear in sys.argv, just as
+			they would if the target module were directly run in a shell.
 
 	[No outputs]
 	'''
 
-	# Pass the arguments in target_cli (if any) through to the target module by
-	# putting them in sys.argv before loading the target module.
-	pass_through_args(target_module_path, options['target_cli'])
-
-	# Load the target module, the iterable, and the target function
-	module_name, module = load_module(target_module_path)
-
-	# Resolve the options.  In `merge_dicts`, the left-more takes precedence.
-	options = get_options(options, module)
-
-	# Get the target function and arguments iterable.
-	target_func, iterable, reducer_func = get_target_func_and_iterable(
-		module, options)
+	# Merge supplied options with those provided in `~/.clufrc` and defaults
+	# then normalize and validate options.
+	options = get_options({}, options)
 
 	# Make a queue on which to put arguments
 	args_queue = IterableQueue()
@@ -670,7 +683,8 @@ def pass_through_args(target_module_path, args):
 	"""
 	Resolve the file name of the name of the target module, and put
 	that name, along with args, into sys.argv.  Recall that the first argument
-	is sys.argv is always the called script's filename.
+	is sys.argv is always the called script's filename, that's why we also 
+	need the target_module_path to be passed in.
 	"""
 
 	# Figure out the filename found for the target script, note that this might
@@ -683,7 +697,7 @@ def pass_through_args(target_module_path, args):
 	if module_fname.strip() == '':
 		module_fname = os.path.basename(target_module_path)
 
-	# Add teh arguments to sys.argv
+	# Add the arguments to sys.argv
 	sys.argv = [module_fname]
 	sys.argv.extend(args)
 
