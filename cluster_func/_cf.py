@@ -642,7 +642,7 @@ def run_direct(target_func, iterable, reducer_func, options):
 		proc.start()
 
 	# Start a process for reduction, if we have a reducer function
-	if reducer_func
+	if reducer_func:
 		# Start the reducer process, if needed
 		reducer_proc = Process(
 			target=reducer_func,
@@ -681,10 +681,11 @@ def get_target_func_and_iterable(target_module, options):
 def pass_through_args(target_module_path, args):
 
 	"""
-	Resolve the file name of the name of the target module, and put
-	that name, along with args, into sys.argv.  Recall that the first argument
-	is sys.argv is always the called script's filename, that's why we also 
-	need the target_module_path to be passed in.
+	Resolve the file name of the target module, and put that name, along with
+	``args``, into sys.argv.  This effectively passes through everything in
+	``args`` to the imported target module, preserving that target module's
+	behavior in response to commandline args.  Recall that ``sys.argv[0]`` is
+	always the called script's filename.
 	"""
 
 	# Figure out the filename found for the target script, note that this might
@@ -714,12 +715,12 @@ def worker(target_func, args_consumer, results_producer):
 		result = target_func(*args.args, **args.kwargs)
 
 		# Pack results onto the queue if we're running a reducer
-		if result_producer:
-			result_producer.put(result)
+		if results_producer:
+			results_producer.put(result)
 
 	# Close the producer when there are no more results to put
-	if result_producer:
-		result_prducer.close()
+	if results_producer:
+		results_producer.close()
 
 
 def generate_args_subset(iterable, options):

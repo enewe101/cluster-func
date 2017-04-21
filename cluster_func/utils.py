@@ -238,6 +238,13 @@ def normalize_options(options):
 			options['hash_cli'] = options['hash']
 			options['hash'] = unfurl(options['hash'])
 
+		# If it is a single int, then we need to wrap it in a list for the 
+		# internal python representation, and turn it into a string for the 
+		# command line representation.
+		elif isinstance(options['hash'], int):
+			options['hash_cli'] = str(options['hash'])
+			options['hash'] = [options['hash']]
+
 		# Otherwise it is in a python iterable type. Make a command line format.
 		else:
 			options['hash_cli'] = ','.join([str(h) for h in options['hash']])
